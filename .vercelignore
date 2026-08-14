@@ -32,5 +32,8 @@ __pycache__/
 *.pyc
 *.bat
 *.md
-requirements.txt
 config.json
+
+# Тек ТҮБІРДЕГІ requirements.txt (AI пакеттері) — api/requirements.txt
+# қажет, ол Vercel-ге сайттың пакеттерін орнатады
+/requirements.txt

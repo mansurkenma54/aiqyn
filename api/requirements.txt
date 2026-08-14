@@ -1,0 +1,13 @@
+# Vercel Python builder дәл осы файлдан пакет орнатады
+# (кіру нүктесінің қасындағы requirements.txt).
+#
+# Мұнда ТЕК САЙТҚА керегі. torch пен ultralytics ЖОҚ — олар 2 ГБ-тан
+# асады да, serverless шегіне сыймайды. Сайтта AI логикасы жоқ,
+# сондықтан олар қажет емес.
+
+fastapi>=0.110
+python-multipart>=0.0.9
+pydantic>=2.6
+python-docx>=1.1
+Pillow>=10.2
+requests>=2.31
