@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050506">
+  <title>AIQYN Portal — инфрақұрылым мониторингі</title>
+
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/" aria-label="AIQYN Portal бас беті">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-copy">
+      <strong>AIQYN</strong><span>Portal</span>
+      <small>Шымкент · инфрақұрылым мониторингі</small>
+    </span>
+  </a>
+
+  <div class="stats" id="stats" aria-label="Жүйе статистикасы"></div>
+
+  <div class="topbar-actions">
+    <label class="live-toggle" title="Деректерді әр 5 секунд сайын жаңарту">
+      <input type="checkbox" id="live-switch" checked>
+      <span class="switch-track" aria-hidden="true"><span></span></span>
+      <span class="live-label"><i class="fa-solid fa-circle" aria-hidden="true"></i> Тікелей эфир</span>
+    </label>
+    <button class="icon-btn has-label" id="btn-export" title="CSV есебін жүктеу">
+      <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i><span>Есеп</span>
+    </button>
+    <button class="btn btn-warning" id="btn-zone">
+      <i class="fa-solid fa-road-barrier" aria-hidden="true"></i><span>Жол учаскесін белгілеу</span>
+    </button>
+    <button class="operator-btn" id="btn-login" aria-label="Оператор ретінде кіру">
+      <span class="operator-avatar"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
+      <span class="operator-copy"><small>Оператор</small><strong id="operator-label">Кірмеген</strong></span>
+    </button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="sidebar" aria-label="Оқиғалар тізімі">
+    <div class="sidebar-head">
+      <div>
+        <p class="eyebrow">Оператор кезегі</p>
+        <h1>Оқиғалар</h1>
+      </div>
+      <span class="connection-pill" id="connection-pill"><i class="fa-solid fa-circle"></i> Желіде</span>
+    </div>
+
+    <div class="search-wrap">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <label class="sr-only" for="filter-search">Оқиғаны іздеу</label>
+      <input id="filter-search" type="search" placeholder="Мекенжай немесе оқиға ID">
+      <kbd title="/ пернесі жылдам іздеуді ашады">/</kbd>
+    </div>
+
+    <div class="filters">
+      <label>
+        <span class="sr-only">Статус сүзгісі</span>
+        <select id="filter-status">
+          <option value="all">Барлық статус</option>
+          <option value="new" selected>Тексеруді күтуде</option>
+          <option value="confirmed">Оператор тексерді</option>
+          <option value="sent">109-ға жіберілді</option>
+          <option value="in_progress">Жұмыс жүргізілуде</option>
+          <option value="repaired">Қайта тексеру</option>
+          <option value="reopened">Қайта ашылды</option>
+          <option value="closed">Жабылды</option>
+          <option value="rejected">Жалған анықтау</option>
+        </select>
+      </label>
+      <label>
+        <span class="sr-only">Санат сүзгісі</span>
+        <select id="filter-type">
+          <option value="all">Барлық санат</option>
+          <option value="pothole">Шұңқыр</option>
+          <option value="crack_alligator">Торлы жарықшақ</option>
+          <option value="crack_longitudinal">Бойлық жарықшақ</option>
+          <option value="crack_transverse">Көлденең жарықшақ</option>
+          <option value="flood">Су басу</option>
+          <option value="streetlight_out">Жарықтандыру</option>
+          <option value="obstruction">Жолдағы кедергі</option>
+        </select>
+      </label>
+      <button class="icon-btn" id="btn-refresh" title="Деректерді жаңарту" aria-label="Деректерді жаңарту">
+        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <div class="type-stats" id="type-stats" aria-label="Ақау түрлері бойынша есеп"></div>
+
+    <div class="list-summary">
+      <span id="list-count">0 оқиға</span>
+      <button class="text-btn" id="btn-show-all">Картада барлығын көрсету</button>
+    </div>
+    <div class="list" id="list" aria-live="polite">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+  </aside>
+
+  <section class="map-wrap" aria-label="Шымкент қаласының инфрақұрылым картасы">
+    <div id="map"></div>
+
+    <div class="map-title-card">
+      <p class="eyebrow">Жедел жағдай</p>
+      <strong>Инфрақұрылым картасы</strong>
+      <span>Оқиғалар, жол жұмыстары және жабық учаскелер</span>
+    </div>
+
+    <div class="layer-control" role="group" aria-label="Карта қабаттары">
+      <button class="layer-toggle active" id="layer-incidents" aria-pressed="true">
+        <span class="legend-dot incident"></span> Ақаулар
+      </button>
+      <button class="layer-toggle active" id="layer-roadworks" aria-pressed="true">
+        <span class="legend-line roadwork"></span> Жол жұмысы
+      </button>
+      <button class="layer-toggle active" id="layer-closures" aria-pressed="true">
+        <span class="legend-line closure"></span> Жабық жол
+      </button>
+    </div>
+
+    <div class="draw-panel" id="draw-panel" role="status" aria-live="polite">
+      <div class="draw-panel-head">
+        <span class="draw-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></span>
+        <div>
+          <strong>Жол учаскесін сызыңыз</strong>
+          <p id="draw-status">Жолдың бойымен кемінде екі нүкте қойыңыз.</p>
+        </div>
+      </div>
+      <div class="draw-actions">
+        <button class="btn btn-ghost" id="zone-undo" disabled><i class="fa-solid fa-arrow-rotate-left"></i> Соңғы нүкте</button>
+        <button class="btn btn-ghost" id="zone-cancel">Болдырмау</button>
+        <button class="btn btn-warning" id="zone-finish" disabled>Учаскені аяқтау</button>
+      </div>
+    </div>
+
+    <div class="location-hint" id="location-hint" role="status">
+      <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+      <span>Маркер орналасатын жол нүктесін картадан таңдаңыз.</span>
+      <button class="btn btn-sm btn-ghost" id="location-cancel">Болдырмау</button>
+    </div>
+
+    <div class="map-legend" aria-label="Карта шартты белгілері">
+      <div><span class="legend-line roadwork"></span><b>Сары</b> — жұмыс жүріп жатыр</div>
+      <div><span class="legend-line closure"></span><b>Қызыл</b> — жол жабық</div>
+      <div><span class="legend-dot approximate"></span><b>Үзік шеңбер</b> — орны нақтыланбаған</div>
+    </div>
+
+    <aside class="detail" id="detail" aria-label="Оқиға карточкасы" aria-hidden="true"></aside>
+  </section>
+</main>
+
+<div class="modal" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
+  <div class="modal-box modal-sm">
+    <button class="modal-close" id="login-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <span class="modal-icon"><i class="fa-solid fa-user-shield"></i></span>
+    <h2 id="login-title">Оператор ретінде кіру</h2>
+    <p class="muted">Оқиғаны тексеру, жол учаскесін белгілеу және өтінім жіберу үшін қажет.</p>
+    <label class="form-field"><span>Логин</span><input type="text" id="login-user" value="admin" autocomplete="username"></label>
+    <label class="form-field"><span>Құпия сөз</span><input type="password" id="login-pass" autocomplete="current-password"></label>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="login-cancel">Болдырмау</button>
+      <button class="btn btn-primary" id="login-submit">Кіру</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="zone-modal" role="dialog" aria-modal="true" aria-labelledby="zone-title">
+  <div class="modal-box modal-lg">
+    <button class="modal-close" id="zone-modal-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <p class="eyebrow">Картаға енгізу</p>
+    <h2 id="zone-title">Жол учаскесі туралы мәлімет</h2>
+    <p class="muted" id="zone-coords">Сызылған геометрия тексерілуде</p>
+
+    <div class="kind-picker" role="radiogroup" aria-label="Учаске түрі">
+      <label class="kind-option repair"><input type="radio" name="zone-kind" value="repair" checked><span><i class="fa-solid fa-person-digging"></i><b>Жол жұмысы</b><small>Сары сызық</small></span></label>
+      <label class="kind-option closed"><input type="radio" name="zone-kind" value="closed"><span><i class="fa-solid fa-ban"></i><b>Жабық жол</b><small>Қызыл сызық</small></span></label>
+      <label class="kind-option ignore"><input type="radio" name="zone-kind" value="ignore"><span><i class="fa-solid fa-eye-slash"></i><b>Ішкі аймақ</b><small>Сұр сызық</small></span></label>
+    </div>
+
+    <div class="form-grid">
+      <label class="form-field span-2"><span>Учаске атауы <b>*</b></span><input type="text" id="zone-name" placeholder="Мысалы: Тәуке хан даңғылы — орташа жөндеу"></label>
+      <label class="form-field"><span>Қай жерден</span><input type="text" id="zone-from" placeholder="Қонаев даңғылы қиылысы"></label>
+      <label class="form-field"><span>Қай жерге дейін</span><input type="text" id="zone-to" placeholder="Бәйдібек би даңғылы қиылысы"></label>
+      <label class="form-field"><span>Басталу күні</span><input type="date" id="zone-start"></label>
+      <label class="form-field"><span>Аяқталу күні</span><input type="date" id="zone-until"></label>
+      <label class="form-field"><span>Дәліз ені, метр</span><input type="number" id="zone-radius" value="18" min="4" max="100"></label>
+      <label class="form-field"><span>Жауапты ұйым</span><input type="text" id="zone-org" placeholder="Мердігер немесе басқарма"></label>
+      <label class="form-field"><span>Тапсырма / жоспар №</span><input type="text" id="zone-ref" placeholder="Мысалы: ЖЖ-2026/184"></label>
+      <label class="form-field"><span>Ресми дереккөз сілтемесі</span><input type="url" id="zone-source" placeholder="https://..."></label>
+    </div>
+
+    <label class="check-row">
+      <input type="checkbox" id="zone-verified">
+      <span><b>Шекараны оператор нақтылады</b><small>Тек нақтыланған учаскелерде жаңа AI өтінімдері автоматты түрде тоқтатылады.</small></span>
+    </label>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="zone-modal-cancel">Картаға оралу</button>
+      <button class="btn btn-warning" id="zone-save"><i class="fa-solid fa-floppy-disk"></i> Учаскені сақтау</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="reject-modal" role="dialog" aria-modal="true" aria-labelledby="reject-title">
+  <div class="modal-box modal-sm">
+    <button class="modal-close" id="reject-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <p class="eyebrow danger">Оператор шешімі</p>
+    <h2 id="reject-title">Анықтауды қабылдамау</h2>
+    <label class="form-field"><span>Себебі <b>*</b></span>
+      <select id="reject-reason">
+        <option value="false_positive">Жалған анықтау</option>
+        <option value="duplicate">Бұрын тіркелген дубликат</option>
+        <option value="known_work_zone">Белгілі жөндеу учаскесі</option>
+        <option value="insufficient_evidence">Дәлел жеткіліксіз</option>
+        <option value="wrong_location">Орны дұрыс емес</option>
+      </select>
+    </label>
+    <label class="form-field"><span>Түсініктеме</span><textarea id="reject-note" rows="3" placeholder="Шешімге қысқаша негіздеме жазыңыз"></textarea></label>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="reject-cancel">Болдырмау</button>
+      <button class="btn btn-danger" id="reject-submit">Қабылдамау</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# Vercel-ге ТЕК САЙТ жүктеледі.
+#
+# AIQYN екі бөлек бағдарлама: Vision (ноутбукта, AI) және Portal (сайт).
+# Сайтта ешқандай AI жоқ, сондықтан модель салмағын, YOLO-ны, torch-ты
+# серверге апарудың қажеті жоқ — олар 2 ГБ-тан асады да, тегін тарифке
+# сыймайды. Сайттың өзі ~1 МБ.
+
+# --- AI бөлігі (серверде керек емес) ---
+vision/
+models/
+scripts/
+simulator/
+evidence/
+outbox/
+preview/
+tests/
+
+# --- жергілікті деректер ---
+portal/media/
+portal/aiqyn.db
+portal/aiqyn.db-wal
+portal/aiqyn.db-shm
+portal/mock_109_tickets.jsonl
+zones_cache.json
+route_cache.json
+
+# --- құпия кілттер (ЕШҚАШАН серверге жүктелмеуі керек) ---
+.env
+
+# --- қызметтік ---
+__pycache__/
+*.pyc
+*.bat
+*.md
+requirements.txt
+config.json

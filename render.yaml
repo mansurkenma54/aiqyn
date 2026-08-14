@@ -1,0 +1,50 @@
+# AIQYN Portal — Render.com-ға орналастыру
+#
+# НЕГЕ VERCEL ЕМЕС:
+#   Vercel — serverless: әр сұрау бөлек «функция» болып іске қосылады,
+#   диск сақталмайды, ұзақ жұмыс істейтін процесс жоқ. Ал бізге керегі:
+#     * дәлел фотолары мен видеоларын САҚТАЙТЫН диск
+#     * SQLite дерекқоры (файл түрінде)
+#     * әрқашан қосулы тұратын сервер
+#   Сондықтан Render (немесе Railway) дұрыс таңдау — екеуінде де тегін
+#   тариф, тұрақты диск және «always-on» сервер бар.
+#
+# ҚАЛАЙ ОРНАЛАСТЫРУ:
+#   1. Жобаны GitHub-қа жүктеңіз
+#   2. render.com -> New -> Blueprint -> репозиторийді таңдаңыз
+#   3. Render осы файлды өзі оқып, бәрін жасайды
+#   4. Environment бөлімінде құпия кілттерді қойыңыз (төмендегі тізім)
+
+services:
+  - type: web
+    name: aiqyn-portal
+    runtime: python
+    plan: free
+    region: frankfurt          # Қазақстанға ең жақын тегін аймақ
+    rootDir: aiqyn
+    buildCommand: pip install -r requirements-portal.txt
+    startCommand: python -m uvicorn portal.app:app --host 0.0.0.0 --port $PORT
+
+    # Дәлел файлдары мен дерекқор осында сақталады (қайта іске қосқанда жоғалмайды)
+    disk:
+      name: aiqyn-data
+      mountPath: /opt/render/project/src/aiqyn/portal/media
+      sizeGB: 1
+
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: AIQYN_ADMIN_USER
+        value: admin
+      # Құпия сөзді Render панелінен қойыңыз (мұнда жазбаңыз!)
+      - key: AIQYN_ADMIN_PASSWORD
+        sync: false
+      - key: AIQYN_PORTAL_PUBLIC_URL
+        sync: false
+      # Telegram (міндетті емес)
+      - key: AIQYN_TELEGRAM_TOKEN
+        sync: false
+      - key: AIQYN_TELEGRAM_CHAT_ID
+        sync: false

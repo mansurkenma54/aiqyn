@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <title>AIQYN — ресми хабарлама</title>
+  <style>
+    /* Басып шығаруға арналған бет: ақ фон, ресми стиль.
+       Браузерден Ctrl+P -> "Сақтау: PDF" арқылы PDF алынады. */
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif; color: #111;
+      background: #fff; margin: 0; padding: 28px; font-size: 13px; line-height: 1.55;
+    }
+    .sheet { max-width: 800px; margin: 0 auto; }
+
+    .head {
+      display: flex; align-items: center; gap: 14px;
+      border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px;
+    }
+    .logo { width: 46px; height: 46px; }
+    .head-title { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+    .head-sub { font-size: 11px; color: #555; margin-top: 2px; }
+    .head-right { margin-left: auto; text-align: right; font-size: 11px; color: #555; }
+
+    .state-band {
+      margin: 0 0 14px; padding: 8px 12px; border: 1px solid #c8c8cc;
+      text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .2px;
+    }
+    .state-draft, .state-unreviewed { background: #fce8e6; border-color: #e7aaa2; }
+    .state-reviewed, .state-submitted { background: #fff4ce; border-color: #dec36a; }
+    .state-registered { background: #e8f3ea; border-color: #9bc5a3; }
+    .state-rejected { background: #f2f2f3; color: #555; }
+
+    h1 { font-size: 16px; margin: 18px 0 4px; }
+    .subject { font-size: 13px; color: #444; margin-bottom: 16px; }
+
+    table.meta { width: 100%; border-collapse: collapse; margin: 14px 0 18px; }
+    table.meta td { padding: 6px 8px; border: 1px solid #ccc; vertical-align: top; }
+    table.meta td.k { background: #f4f4f5; width: 190px; font-weight: 600; }
+
+    .text { white-space: pre-wrap; margin: 12px 0 18px; }
+    .divider { border-top: 1px dashed #bbb; margin: 22px 0 16px; }
+    .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 7px; }
+    .notice {
+      margin: 14px 0; padding: 9px 11px; background: #f7f7f8;
+      border-left: 3px solid #777; color: #444; font-size: 11px;
+    }
+    .attachments { margin: 6px 0 18px 22px; padding: 0; }
+    .attachments li { margin: 3px 0; }
+
+    .evidence { display: flex; gap: 12px; margin: 12px 0; }
+    .evidence figure { margin: 0; flex: 1; }
+    .evidence img { width: 100%; border: 1px solid #ccc; }
+    .evidence figcaption { font-size: 10px; color: #666; margin-top: 4px; }
+
+    .sign { margin-top: 30px; font-size: 12px; }
+    .foot {
+      margin-top: 26px; padding-top: 10px; border-top: 1px solid #ddd;
+      font-size: 10px; color: #777;
+    }
+    .badge {
+      display: inline-block; padding: 2px 8px; border: 1px solid #999;
+      border-radius: 3px; font-size: 11px;
+    }
+    .toolbar { text-align: center; margin-bottom: 18px; }
+    .toolbar button {
+      padding: 9px 20px; font-size: 13px; cursor: pointer;
+      border: 1px solid #111; background: #111; color: #fff; border-radius: 5px;
+    }
+    @media print { .toolbar { display: none; } body { padding: 0; } }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()">PDF ретінде сақтау / басып шығару</button>
+</div>
+
+<div class="sheet" id="sheet">Жүктелуде...</div>
+
+<script>
+const EVENT_ID = "__EVENT_ID__";
+
+const LOGO = `<svg class="logo" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="22" fill="#111"/>
+  <ellipse cx="50" cy="50" rx="40" ry="25" transform="rotate(-38 50 50)" fill="#fff"/>
+  <path d="M50 33 L54.5 46 L67 50 L54.5 54 L50 67 L45.5 54 L33 50 L45.5 46 Z" fill="#111"/>
+  <circle cx="68" cy="33" r="6.5" fill="#ff2020"/>
+</svg>`;
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+const SYSTEM_ACTORS = new Set(['', 'system', 'auto', 'aiqyn', 'aiqyn vision']);
+
+function displayTime(value) {
+  const text = String(value ?? '').trim();
+  return text ? text.replace('T', ' ').replace('+05:00', '').slice(0, 19) : '';
+}
+
+function firstValue(doc, ...keys) {
+  for (const key of keys) {
+    if (doc[key] !== null && doc[key] !== undefined && doc[key] !== '') return doc[key];
+  }
+  return null;
+}
+
+function numberOrNull(value) {
+  const parsed = Number(value);
+  return value === null || value === undefined || value === '' || !Number.isFinite(parsed)
+    ? null : parsed;
+}
+
+function coords(lat, lon) {
+  const latitude = numberOrNull(lat);
+  const longitude = numberOrNull(lon);
+  return latitude === null || longitude === null
+    ? '—' : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function externalTicketId(doc) {
+  return String(firstValue(
+    doc, 'external_ticket_id', 'service_request_id', 'ticket_id', 'registration_number'
+  ) ?? '').trim();
+}
+
+function operatorReview(doc) {
+  const actor = firstValue(doc, 'reviewer_name', 'reviewer_id', 'reviewed_by');
+  if (actor && !SYSTEM_ACTORS.has(String(actor).trim().toLowerCase())) {
+    return {
+      actor: String(actor),
+      at: displayTime(firstValue(doc, 'reviewed_at', 'verified_at')),
+      decision: String(doc.review_status || 'verified'),
+    };
+  }
+
+  const history = Array.isArray(doc.history) ? [...doc.history].reverse() : [];
+  for (const item of history) {
+    const status = String(item.status || '').toLowerCase();
+    const itemActor = String(item.actor || '').trim();
+    if (!['confirmed', 'verified', 'rejected'].includes(status)) continue;
+    if (SYSTEM_ACTORS.has(itemActor.toLowerCase())) continue;
+    return { actor: itemActor, at: displayTime(item.created_at), decision: status };
+  }
+  return null;
+}
+
+function documentState(doc, review, ticketId) {
+  const status = String(doc.status || 'new').toLowerCase();
+  const sent = Boolean(doc.sent_at) || [
+    'sent', 'submitted', 'registered', 'assigned', 'in_progress', 'resolved',
+    'repaired', 'verification_pending', 'closed', 'reopened',
+  ].includes(status);
+
+  if (ticketId) return {
+    css: 'state-registered', draft: false,
+    label: `ЕКЦ 109-ДА ТІРКЕЛГЕН  ·  № ${ticketId}`,
+    title: 'Жол инфрақұрылымындағы ақауды тексеру және жою жөніндегі өтінім',
+  };
+  if (status === 'rejected') return {
+    css: 'state-rejected', draft: true,
+    label: 'ОПЕРАТОР РАСТАМАДЫ — РЕСМИ АРНАҒА ЖІБЕРІЛМЕЙДІ',
+    title: 'Ақау белгісі туралы оқиға карточкасы',
+  };
+  if (sent && !review) return {
+    css: 'state-unreviewed', draft: false,
+    label: 'ЖІБЕРІЛГЕН — ОПЕРАТОР ТЕКСЕРУІ РАСТАЛМАҒАН',
+    title: 'Жол инфрақұрылымындағы ақау туралы хабарлама',
+  };
+  if (sent) return {
+    css: 'state-submitted', draft: false,
+    label: 'РЕСМИ АРНАҒА ЖІБЕРІЛДІ — ТІРКЕУ НӨМІРІ КҮТІЛУДЕ',
+    title: 'Жол инфрақұрылымындағы ақауды тексеру және жою жөніндегі өтінім',
+  };
+  if (review && review.decision !== 'rejected') return {
+    css: 'state-reviewed', draft: true,
+    label: 'ОПЕРАТОР ТЕКСЕРГЕН ӨТІНІМ ЖОБАСЫ — РЕСМИ АРНАҒА ЖІБЕРІЛМЕГЕН',
+    title: 'Жол инфрақұрылымындағы ақауды тексеру және жою жөніндегі өтінім жобасы',
+  };
+  return {
+    css: 'state-draft', draft: true,
+    label: 'ӨТІНІМ ЖОБАСЫ — РЕСМИ АРНАҒА ЖІБЕРІЛМЕГЕН',
+    title: 'Жол инфрақұрылымындағы ақауды тексеру және жою жөніндегі өтінім жобасы',
+  };
+}
+
+fetch(`/api/documents/${EVENT_ID}`)
+  .then((response) => response.json())
+  .then((doc) => {
+    const media = `/media/${doc.event_id}`;
+    const generated = new Date().toLocaleString('kk-KZ');
+    const review = operatorReview(doc);
+    const ticketId = externalTicketId(doc);
+    const state = documentState(doc, review, ticketId);
+
+    const displayLat = firstValue(doc, 'display_lat', 'snapped_lat', 'lat');
+    const displayLon = firstValue(doc, 'display_lon', 'snapped_lon', 'lon');
+    const rawLat = firstValue(doc, 'original_lat', 'raw_lat', 'lat');
+    const rawLon = firstValue(doc, 'original_lon', 'raw_lon', 'lon');
+    const displayCoords = coords(displayLat, displayLon);
+    const rawCoords = coords(rawLat, rawLon);
+    const accuracy = numberOrNull(firstValue(
+      doc, 'display_accuracy_m', 'location_accuracy_m', 'gps_accuracy_m'
+    ));
+    const dueAt = firstValue(doc, 'due_at', 'sla_due_at', 'planned_due_at');
+    const assignedOrg = firstValue(doc, 'assigned_org', 'executor', 'responsible_service');
+
+    const attachments = [];
+    if (doc.photo_file) {
+      const hash = firstValue(doc, 'photo_sha256', 'image_sha256', 'evidence_sha256');
+      attachments.push(`Фотофиксация: ${doc.photo_file}${hash ? ` · SHA-256: ${hash}` : ''}`);
+    }
+    if (doc.video_file) {
+      const hash = firstValue(doc, 'video_sha256', 'clip_sha256');
+      attachments.push(
+        `Видеожазба: ${doc.video_file} · ұзақтығы ${doc.video_seconds || 0} секунд`
+        + (hash ? ` · SHA-256: ${hash}` : '')
+      );
+    }
+    if (doc.after_photo_file) attachments.push(`Орындалғаннан кейінгі фото: ${doc.after_photo_file}`);
+
+    const reviewText = review
+      ? `${review.actor} · ${review.decision === 'rejected' ? 'оқиғаны растамады' : 'оқиғаны растады'}`
+        + (review.at ? ` · ${review.at}` : '')
+      : '';
+    const sentAt = displayTime(doc.sent_at);
+    const stateNote = ticketId
+      ? `ЕКЦ 109 жүйесіндегі тіркеу нөмірі: ${ticketId}.`
+      : state.draft
+        ? 'ӨТІНІМ ЖОБАСЫ — ресми арнаға жіберілмеген.'
+        : 'Ресми арнаға жіберілген; сыртқы тіркеу нөмірі көрсетілмеген.';
+
+    document.getElementById('sheet').innerHTML = `
+      <div class="head">
+        ${LOGO}
+        <div>
+          <div class="head-title">AIQYN</div>
+          <div class="head-sub">Қала инфрақұрылымын автоматты бақылау жүйесі · Шымкент</div>
+        </div>
+        <div class="head-right">
+          AIQYN оқиға ID<br><b>${esc(doc.event_id)}</b><br>
+          ${esc(generated)}
+        </div>
+      </div>
+
+      <div class="state-band ${state.css}">${esc(state.label)}</div>
+
+      <h1>${esc(state.title)}</h1>
+      <div class="subject">
+        Кімге: ${esc(doc.responsible_org || '—')}<br>
+        ${doc.responsible_org_ru ? 'Кому: ' + esc(doc.responsible_org_ru) : ''}
+      </div>
+
+      <table class="meta">
+        <tr><td class="k">AIQYN оқиға ID</td><td>${esc(doc.event_id)}</td></tr>
+        ${ticketId ? `<tr><td class="k">ЕКЦ 109 тіркеу нөмірі</td><td>${esc(ticketId)}</td></tr>` : ''}
+        ${doc.service_code ? `<tr><td class="k">Қызмет коды</td><td>${esc(doc.service_code)}</td></tr>` : ''}
+        <tr><td class="k">Ақау белгісі</td><td>${esc(doc.defect_type_official)}</td></tr>
+        <tr><td class="k">Тип дефекта</td><td>${esc(doc.defect_type_official_ru)}</td></tr>
+        <tr><td class="k">Оқиға орны</td><td>${esc(doc.address_text)}</td></tr>
+        <tr><td class="k">Картадағы координаттар</td>
+            <td>${esc(displayCoords)}
+                &nbsp; <a href="${esc(doc.map_link)}">${esc(doc.map_link)}</a></td></tr>
+        ${rawCoords !== '—' && rawCoords !== displayCoords
+          ? `<tr><td class="k">Бастапқы GPS координаттары</td><td>${esc(rawCoords)}</td></tr>` : ''}
+        ${accuracy && accuracy > 0
+          ? `<tr><td class="k">Геопозиция дәлдігі</td><td>±${Math.round(accuracy)} м (болжамды)</td></tr>`
+          : !doc.gps_trusted
+            ? '<tr><td class="k">Геопозиция дәлдігі</td><td>Дереккөз көрсетпеген; нақтылау қажет</td></tr>'
+            : ''}
+        <tr><td class="k">Анықталған уақыты</td><td>${esc(doc.timestamp_human)}</td></tr>
+        <tr><td class="k">Алдын ала қауіп деңгейі</td>
+            <td><span class="badge">${esc(doc.severity_kk || doc.severity)}</span>
+                &nbsp; автоматты бағалау; маман тексеруін талап етеді</td></tr>
+        <tr><td class="k">Модель сенімділігі</td>
+            <td>${Math.round((doc.confidence || 0) * 100)}% (${esc(doc.detector)}; қауіп деңгейі емес)</td></tr>
+        <tr><td class="k">Жол жұмыстары тізілімімен салыстыру</td>
+            <td>${doc.marked_on_road
+              ? 'Белсенді учаскемен автоматты сәйкестік бар'
+              : 'Автоматты сәйкестік табылмады; операторлық нақтылау қажет'}</td></tr>
+        ${review ? `<tr><td class="k">Операторлық тексеру</td><td>${esc(reviewText)}</td></tr>` : ''}
+        ${assignedOrg ? `<tr><td class="k">Тағайындалған орындаушы</td><td>${esc(assignedOrg)}</td></tr>` : ''}
+        ${dueAt ? `<tr><td class="k">Жоспарлы орындалу мерзімі</td><td>${esc(displayTime(dueAt))}</td></tr>` : ''}
+        ${doc.ai_verified ? `<tr><td class="k">Қосымша AI бағасы</td>
+          <td>Алдын ала талдау бар (${Math.round((doc.ai_confidence || 0) * 100)}%);
+              инженерлік тексеруді алмастырмайды</td></tr>` : ''}
+        <tr><td class="k">Дереккөз</td>
+            <td>${esc(doc.source_type)} · ${esc(doc.app_version)}</td></tr>
+      </table>
+
+      <div class="section-title">${state.draft ? 'Өтінім жобасының мәтіні' : 'Өтінім мәтіні'}</div>
+      <div class="text">${esc(doc.description_text)}</div>
+      <div class="divider"></div>
+      <div class="section-title">${state.draft ? 'Текст проекта заявки (рус.)' : 'Текст заявки (рус.)'}</div>
+      <div class="text" style="color:#333">${esc(doc.description_text_ru)}</div>
+
+      <div class="notice">
+        Маңызды: AI-модельдің бағасы алдын ала сипатта болады және инженерлік тексеруді,
+        нормативтік қорытындыны немесе жауапты органның шешімін алмастырмайды.
+      </div>
+
+      ${attachments.length ? `
+        <div class="section-title">Қосымшалар тізімі</div>
+        <ol class="attachments">${attachments.map((item) => `<li>${esc(item)}</li>`).join('')}</ol>
+      ` : ''}
+
+      <div class="section-title">Фото және видео материалдар</div>
+      <div class="evidence">
+        ${doc.photo_file ? `<figure>
+          <img src="${media}/${doc.photo_file}">
+          <figcaption>Ақау сәтіндегі фотофиксация (${esc(doc.timestamp_human)})</figcaption>
+        </figure>` : ''}
+        ${doc.after_photo_file ? `<figure>
+          <img src="${media}/${doc.after_photo_file}">
+          <figcaption>Жөндеуден кейін</figcaption>
+        </figure>` : ''}
+      </div>
+      ${doc.video_file ? `<p style="font-size:11px;color:#555">
+        Видеожазба: ${doc.video_seconds || 0} сек — электрондық нұсқада қоса беріледі
+        (файл: ${esc(doc.video_file)}).</p>` : ''}
+
+      <div class="sign">
+        Оқиға карточкасын қалыптастырған: <b>AIQYN Vision</b> (автоматты мониторинг)<br>
+        ${review
+          ? `Операторлық тексеру: <b>${esc(reviewText)}</b><br>`
+          : '<b>Операторлық тексеру жүргізілмеген немесе жүйе тарихымен расталмаған.</b><br>'}
+        ${ticketId ? `ЕКЦ 109 тіркеу нөмірі: <b>${esc(ticketId)}</b><br>` : ''}
+        ${!ticketId && sentAt ? `Жіберілген уақыты: ${esc(sentAt)} · тіркеу нөмірі күтілуде<br>` : ''}
+        Статус: <b>${esc(doc.status_label || doc.status)}</b>
+      </div>
+
+      <div class="foot">
+        ${esc(stateNote)}
+        ${review ? `Операторлық тексеру: ${esc(reviewText)}.`
+          : 'Оператор тексеруі құжат деректерімен расталмаған.'}
+        AI бағасы инженерлік тексеруді немесе жауапты органның шешімін алмастырмайды.
+        Жүйе тұлғаны немесе көлік нөмірін танымайды; тек инфрақұрылым ақауының
+        белгілерін тіркейді. AIQYN оқиға ID: ${esc(doc.event_id)}.
+      </div>
+    `;
+    document.title = `AIQYN — ${doc.event_id}`;
+  })
+  .catch(() => {
+    document.getElementById('sheet').innerHTML = '<p>Құжат жүктелмеді.</p>';
+  });
+</script>
+</body>
+</html>

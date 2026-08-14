@@ -1,0 +1,12 @@
+# AIQYN Portal (сайт) — тек серверге керек пакеттер.
+#
+# Сайтта ЕШҚАНДАЙ AI/ML жоқ, сондықтан torch пен ultralytics КЕРЕК ЕМЕС.
+# Осының арқасында сервер жеңіл әрі тегін тарифке сыяды (~80 МБ, 2 ГБ емес).
+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+pydantic>=2.6
+python-docx>=1.1
+Pillow>=10.2
+requests>=2.31

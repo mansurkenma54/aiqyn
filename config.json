@@ -1,0 +1,49 @@
+{
+  "_comment": "AIQYN Vision баптаулары. Командалық жол аргументтері осы мәндерді басып жаза алады.",
+
+  "_phone_comment": "USB модем қосылғанда телефонның мекенжайы. Өзгеріп кетсе: python -m vision.main scan",
+  "source": "phone",
+  "phone_host": "10.120.108.122",
+  "phone_port": 8080,
+
+  "weights": "models/RDD_best.pt",
+  "conf_threshold": 0.6,
+  "frame_stride": 5,
+  "imgsz": 640,
+  "device": "cpu",
+
+  "_focus_comment": "Жоба БІР МІНДЕТКЕ шоғырланған: жол ақауын дәл табу. Су тасу мен көше жарығы детекторлары уақытша өшірулі (жалған сигнал көп берді).",
+  "enable_yolo": true,
+  "enable_flood": false,
+  "enable_streetlight": false,
+
+  "_road_only_comment": "Ақау ТЕК жол бетінен ізделеді; растау үшін бірнеше кадрда көрінуі керек.",
+  "road_only": true,
+  "confirm_frames": 1,
+  "confirm_window": 6,
+  "night_brightness": 65.0,
+
+  "pre_roll_sec": 3.0,
+  "post_roll_sec": 5.0,
+  "clip_fps": 15.0,
+
+  "_latency_comment": "МАҢЫЗДЫ: ағын кідірісі. Далалық тесте нақтылаңыз — GPS дәлдігі осыған тәуелді.",
+  "stream_latency_sec": 0.8,
+  "gps_poll_hz": 2.0,
+
+  "fallback_lat": 42.3156,
+  "fallback_lon": 69.5869,
+
+  "_dedup_comment": "dedup_window_sec = 0 -> бір ақау сапар бойы БІР РЕТ қана тіркеледі (қайта өтсеңіз де қайталанбайды).",
+  "dedup_radius_m": 25.0,
+  "dedup_window_sec": 0,
+
+  "portal_url": "http://localhost:8000",
+  "send_enabled": true,
+
+  "show_preview": true,
+  "draw_lanes": true,
+  "preview_width": 960,
+
+  "log_level": "INFO"
+}

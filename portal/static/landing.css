@@ -1,0 +1,259 @@
+/* AIQYN басты беті — Apple-стильдегі минималистік landing */
+:root {
+  color-scheme: dark;
+  --bg: #050506;
+  --panel: #101013;
+  --fill: rgba(255, 255, 255, .055);
+  --fill-strong: rgba(255, 255, 255, .09);
+  --line: rgba(255, 255, 255, .075);
+  --line-strong: rgba(255, 255, 255, .14);
+  --text: #f5f5f7;
+  --muted: #98989f;
+  --muted-2: #63636b;
+  --red: #ff453a;
+  --red-deep: #ff6961;
+  --amber: #ffd60a;
+  --amber-soft: #ffe14d;
+  --green: #30d158;
+  --cyan: #64d2ff;
+  --blue: #0a84ff;
+  --tint-red: rgba(255, 69, 58, .14);
+  --tint-amber: rgba(255, 214, 10, .13);
+  --tint-green: rgba(48, 209, 88, .13);
+  --tint-cyan: rgba(100, 210, 255, .13);
+  --tint-blue: rgba(10, 132, 255, .16);
+  --ease: cubic-bezier(.32, .72, .28, 1);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, "Segoe UI Variable", "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  letter-spacing: -.01em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: rgba(100, 210, 255, .28); }
+
+a { color: inherit; text-decoration: none; }
+a:focus-visible, .btn:focus-visible { box-shadow: 0 0 0 3.5px rgba(100, 210, 255, .3); outline: none; border-radius: 12px; }
+
+/* ---------- Навигация ---------- */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 28px;
+  height: 60px; padding: 0 max(24px, calc((100vw - 1180px) / 2));
+  background: rgba(5, 5, 6, .72);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: #000 url('/static/aiqyn-brand.jpeg') center / 82px 82px no-repeat;
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 2px 8px rgba(0,0,0,.35);
+}
+.brand-copy { display: flex; align-items: baseline; gap: 7px; }
+.brand-copy strong { font-size: 15.5px; font-weight: 700; letter-spacing: .04em; }
+.brand-copy > span { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.nav-links { display: flex; gap: 24px; margin-left: auto; }
+.nav-links a {
+  color: var(--muted); font-size: 13px; font-weight: 500;
+  transition: color .18s var(--ease);
+}
+.nav-links a:hover { color: var(--text); }
+
+/* ---------- Батырмалар ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 38px; padding: 0 16px;
+  border: 1px solid transparent; border-radius: 12px;
+  background: var(--fill-strong); color: var(--text);
+  font-weight: 600; font-size: 13px; cursor: pointer;
+  transition: background .18s var(--ease), filter .18s var(--ease), transform .12s var(--ease);
+}
+.btn:hover { background: rgba(255, 255, 255, .13); }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--red); color: #fff; }
+.btn-primary:hover { background: #ff5f55; }
+.btn-ghost { background: transparent; border-color: var(--line-strong); }
+.btn-ghost:hover { background: var(--fill); }
+.btn-lg { min-height: 50px; padding: 0 24px; border-radius: 999px; font-size: 15px; }
+.btn-lg i { font-size: 13px; transition: transform .18s var(--ease); }
+.btn-lg:hover i { transform: translateX(3px); }
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  padding: 96px 24px 0;
+  text-align: center;
+  overflow: hidden;
+}
+.hero::before {
+  content: "";
+  position: absolute; inset: 0 0 auto;
+  height: 640px;
+  background:
+    radial-gradient(42% 46% at 50% 0%, rgba(255, 69, 58, .12), transparent 70%),
+    radial-gradient(30% 40% at 68% 8%, rgba(255, 214, 10, .07), transparent 70%),
+    radial-gradient(30% 40% at 32% 8%, rgba(10, 132, 255, .08), transparent 70%);
+  pointer-events: none;
+}
+.hero > * { position: relative; }
+.eyebrow {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+}
+.hero h1 {
+  margin: 0 auto 20px; max-width: 900px;
+  font-size: clamp(38px, 6.2vw, 74px);
+  font-weight: 700; letter-spacing: -.035em; line-height: 1.04;
+}
+.grad {
+  background: linear-gradient(92deg, #ff6961, #ffd60a 58%, #ffe9a3);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.sub {
+  margin: 0 auto; max-width: 640px;
+  color: var(--muted); font-size: clamp(15px, 1.6vw, 18px); line-height: 1.6;
+}
+.cta-row { display: flex; justify-content: center; gap: 12px; margin-top: 34px; flex-wrap: wrap; }
+
+.hero-visual { margin: 72px auto 0; max-width: 1120px; perspective: 1400px; }
+.browser-frame {
+  border: 1px solid var(--line-strong);
+  border-radius: 18px 18px 0 0;
+  border-bottom: 0;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .55), 0 0 90px rgba(255, 69, 58, .07);
+  transform: rotateX(4deg);
+  transform-origin: 50% 100%;
+}
+.browser-bar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 11px 14px;
+  background: rgba(255, 255, 255, .035);
+  border-bottom: 1px solid var(--line);
+}
+.browser-bar span { width: 11px; height: 11px; border-radius: 50%; background: var(--fill-strong); }
+.browser-bar span:nth-child(1) { background: rgba(255, 95, 86, .75); }
+.browser-bar span:nth-child(2) { background: rgba(255, 189, 46, .75); }
+.browser-bar span:nth-child(3) { background: rgba(39, 201, 63, .75); }
+.browser-bar em {
+  margin-left: 10px; color: var(--muted-2);
+  font-size: 11.5px; font-style: normal; font-weight: 500;
+}
+.hero-visual img { display: block; width: 100%; height: auto; }
+
+/* ---------- Статистика ---------- */
+.stats-band { padding: 88px 24px 8px; max-width: 1120px; margin: 0 auto; text-align: center; }
+.stats-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 26px;
+}
+.stat-tile {
+  padding: 26px 18px;
+  background: var(--fill); border: 1px solid var(--line); border-radius: 20px;
+  transition: background .2s var(--ease), transform .2s var(--ease);
+}
+.stat-tile:hover { background: var(--fill-strong); transform: translateY(-2px); }
+.stat-tile b {
+  display: block; font-size: 40px; font-weight: 700; letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums; line-height: 1.05;
+}
+.stat-tile span { display: block; margin-top: 7px; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.stat-tile.alert b { color: var(--red-deep); }
+.stat-tile.work b { color: var(--amber-soft); }
+
+/* ---------- Мүмкіндіктер ---------- */
+.features { padding: 100px 24px 8px; max-width: 1120px; margin: 0 auto; }
+.features .eyebrow, .process .eyebrow { text-align: center; }
+.features h2, .process h2, .cta-band h2 {
+  margin: 0 auto 14px; max-width: 720px; text-align: center;
+  font-size: clamp(28px, 3.6vw, 44px); font-weight: 700; letter-spacing: -.03em; line-height: 1.12;
+}
+.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 40px; }
+.feature-card {
+  padding: 30px 28px;
+  background: var(--fill); border: 1px solid var(--line); border-radius: 22px;
+  transition: background .2s var(--ease), transform .2s var(--ease), border-color .2s var(--ease);
+}
+.feature-card:hover { background: var(--fill-strong); border-color: var(--line-strong); transform: translateY(-3px); }
+.feature-icon {
+  width: 46px; height: 46px; display: grid; place-items: center;
+  border-radius: 14px; background: var(--tint-cyan); color: var(--cyan); font-size: 18px;
+}
+.feature-icon.amber { background: var(--tint-amber); color: var(--amber-soft); }
+.feature-icon.blue { background: var(--tint-blue); color: #7db8ff; }
+.feature-icon.green { background: var(--tint-green); color: #6ee7a0; }
+.feature-card h3 { margin: 18px 0 8px; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.feature-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+
+/* ---------- Процесс ---------- */
+.process { padding: 100px 24px 8px; max-width: 1120px; margin: 0 auto; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 40px; }
+.step {
+  position: relative; padding: 28px 26px;
+  border-top: 1px solid var(--line-strong);
+}
+.step-num {
+  display: block; margin-bottom: 16px;
+  font-size: 13px; font-weight: 700; letter-spacing: .1em;
+  color: var(--red-deep);
+}
+.step h3 { margin: 0 0 8px; font-size: 17.5px; font-weight: 700; letter-spacing: -.02em; }
+.step p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.65; }
+
+/* ---------- CTA ---------- */
+.cta-band {
+  margin: 110px auto 0; padding: 90px 24px;
+  max-width: 1120px;
+  text-align: center;
+  border: 1px solid var(--line); border-radius: 28px;
+  background:
+    radial-gradient(60% 90% at 50% 0%, rgba(255, 69, 58, .1), transparent 70%),
+    var(--fill);
+}
+.cta-band p { margin: 0 0 30px; color: var(--muted); font-size: 15px; }
+
+/* ---------- Футер ---------- */
+.footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  max-width: 1120px; margin: 70px auto 0; padding: 28px 24px 34px;
+  border-top: 1px solid var(--line);
+  color: var(--muted-2); font-size: 12.5px;
+}
+.footer p { margin: 0; }
+
+/* ---------- Reveal анимациясы ---------- */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ---------- Адаптивті ---------- */
+@media (max-width: 860px) {
+  .nav { gap: 14px; }
+  .nav-links { display: none; }
+  .hero { padding-top: 64px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .feature-grid, .steps { grid-template-columns: 1fr; }
+  .browser-frame { transform: none; }
+  .cta-band { margin: 70px 16px 0; padding: 60px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .reveal { opacity: 1; transform: none; }
+}

@@ -1,0 +1,14 @@
+# AIQYN Vision — программаның тәуелділіктері
+#
+# Орнату:
+#   python -m pip install -r requirements.txt
+#
+# Ескерту: ultralytics өзімен бірге torch-ты да тартады (~200-800 МБ).
+# Интернеті баяу жерде алдын ала орнатып қойған дұрыс.
+
+opencv-python>=4.8
+numpy>=1.24
+requests>=2.31
+Pillow>=10.0
+ultralytics>=8.0
+psutil>=5.9

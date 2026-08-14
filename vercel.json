@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "45mb", "runtime": "python3.12" }
+    }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/api/index.py" },
+    { "src": "/(.*)", "dest": "/api/index.py" }
+  ],
+  "env": {
+    "AIQYN_DB_PATH": "/tmp/aiqyn.db",
+    "AIQYN_MEDIA_DIR": "portal/demo/media",
+    "AIQYN_READ_ONLY": "1"
+  }
+}

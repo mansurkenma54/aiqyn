@@ -1,0 +1,27 @@
+# Құпия кілттер — ЕШҚАШАН GitHub-қа жіберілмеуі керек
+.env
+
+# Модель салмағы (85 МБ) — scripts/fetch_weights.py арқылы жүктеледі
+models/*.pt
+
+# Жұмыс файлдары
+evidence/
+outbox/
+zones_cache.json
+portal/media/
+portal/aiqyn.db
+portal/aiqyn.db-*
+portal/mock_109_tickets.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Дерекқордың сақтық көшірмелері
+*.bak
+portal/aiqyn.db*
+
+# Дизайн тексерісінің скриншоттары (өнімге кірмейді, 17 МБ)
+audit/

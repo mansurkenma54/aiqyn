@@ -1,0 +1,124 @@
+"""Сайттағы деректерді ДЕМО суреті етіп сақтау (Vercel үшін).
+
+Не істейді:
+    * қазіргі құжаттар мен аймақтарды `portal/demo/snapshot.json` файлына жазады
+    * дәлел фотоларын `portal/demo/media/` қалтасына көшіреді
+
+Не үшін: Vercel — serverless, жазылған дерек сақталмайды. Ал демо суреті
+репозиторийде жатса, сайт әр ашылғанда оны автоматты жүктейді де, жюри
+сілтемені басқанда карта толы болып тұрады.
+
+Қолдану:
+    python scripts/export_demo.py
+    python scripts/export_demo.py --limit 30
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from portal import db  # noqa: E402
+
+DEMO_DIR = ROOT / "portal" / "demo"
+MEDIA_SRC = ROOT / "portal" / "media"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=200)
+    parser.add_argument("--with-video", action="store_true",
+                        help="видео клиптерді де көшіру (файл көлемі өседі)")
+    args = parser.parse_args()
+
+    db.init_db()
+
+    documents = db.list_documents(status="all", limit=args.limit)
+    zones = db.list_zones(active_only=False)
+
+    DEMO_DIR.mkdir(parents=True, exist_ok=True)
+    media_dst = DEMO_DIR / "media"
+    if media_dst.exists():
+        shutil.rmtree(media_dst)
+    media_dst.mkdir(parents=True, exist_ok=True)
+
+    exported = []
+    copied = 0
+
+    for document in documents:
+        document.pop("raw_json", None)
+        document.pop("history", None)
+
+        event_id = document.get("event_id")
+        source = MEDIA_SRC / event_id
+        target = media_dst / event_id
+
+        if source.exists():
+            target.mkdir(parents=True, exist_ok=True)
+            for name in (document.get("photo_file"), document.get("after_photo_file")):
+                if name and (source / name).exists():
+                    shutil.copy2(source / name, target / name)
+                    copied += 1
+            if args.with_video and document.get("video_file"):
+                video = source / document["video_file"]
+                if video.exists():
+                    shutil.copy2(video, target / document["video_file"])
+                    copied += 1
+                else:
+                    document["video_file"] = None
+            elif not args.with_video:
+                # Демода видео жоқ: файл көлемі GitHub үшін тым үлкен болмасын
+                document["video_file"] = None
+
+        exported.append(document)
+
+    snapshot = {
+        "generated_at": db.now_iso(),
+        "documents": exported,
+        "zones": [
+            {
+                "name": z.get("name"),
+                "kind": z.get("kind"),
+                "shape": z.get("shape"),
+                "lat": z.get("lat"),
+                "lon": z.get("lon"),
+                "radius_m": z.get("radius_m"),
+                "points": z.get("points") or z.get("polygon"),
+                "corridor_m": z.get("corridor_m"),
+                "valid_until": z.get("valid_until"),
+                "boundary_verified": z.get("boundary_verified"),
+                "note": z.get("note"),
+            }
+            for z in zones
+        ],
+    }
+
+    path = DEMO_DIR / "snapshot.json"
+    path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    size_mb = sum(f.stat().st_size for f in DEMO_DIR.rglob("*") if f.is_file()) / 1e6
+
+    print()
+    print("=" * 62)
+    print("  ДЕМО СУРЕТІ ДАЙЫН")
+    print("=" * 62)
+    print(f"  Құжат      : {len(exported)}")
+    print(f"  Аймақ      : {len(snapshot['zones'])}")
+    print(f"  Файл       : {copied} сурет")
+    print(f"  Қалта      : {DEMO_DIR}")
+    print(f"  Жалпы көлем: {size_mb:.1f} МБ")
+    print()
+    print("  Бұл қалтаны GitHub-қа жүктеңіз — Vercel сайтты сол деректермен")
+    print("  ашады. Жаңа деректер қосылса, осы команданы қайта жүргізіңіз.")
+    print()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
