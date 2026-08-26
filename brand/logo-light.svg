@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="150" viewBox="0 0 560 150"><title>AIQYN</title><g transform="translate(34,32) scale(1.35)">
+    <rect width="64" height="64" rx="17" fill="#0A0C0F"/>
+    <g stroke="#00E0FF" stroke-width="3" stroke-linecap="round" fill="none" opacity=".9">
+      <path d="M13 24 V16 H21"/><path d="M43 16 H51 V24"/>
+      <path d="M13 40 V48 H21"/><path d="M51 40 V48 H43"/>
+    </g>
+    <path d="M17 32 L22 26.5 L26 36 L30 28.5 L34 34 L38 31.5 L41 32.4 H47"
+          fill="none" stroke="#FFC933" stroke-width="3.6"
+          stroke-linecap="round" stroke-linejoin="round"/></g><text x="180" y="76" font-family="Space Grotesk, Segoe UI Semibold, Segoe UI, Arial, sans-serif" font-size="46"
+       font-weight="700" fill="#0A0C0F" letter-spacing="-0.5">AIQYN</text><text x="182" y="108" font-family="IBM Plex Sans, Segoe UI Semibold, Segoe UI, Arial, sans-serif" font-size="19"
+       fill="#00E0FF">From camera frame to filed report</text></svg>

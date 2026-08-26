@@ -861,6 +861,80 @@ def logo_png(size: int = 512, transparent: bool = False):
     return Response(content=png_bytes(size, transparent), media_type="image/png")
 
 
+ORIGIN = "https://aiqyn-alpha.vercel.app"
+
+ROBOTS_TXT = "\n".join([
+    f"# {ORIGIN}",
+    "User-agent: *",
+    "Allow: /",
+    "",
+    "# API мен дәлел файлдары индекстелмейді",
+    "Disallow: /api/",
+    "Disallow: /media/",
+    "Disallow: /documents/",
+    "",
+    f"Sitemap: {ORIGIN}/sitemap.xml",
+    "",
+])
+
+SITEMAP_PAGES = (("/", "1.0"), ("/portal", "0.8"))
+
+
+@app.get("/robots.txt")
+def robots_txt():
+    """Іздеу жүйелеріне арналған нұсқау.
+
+    Vercel конфигурациясы әр сұрауды осы функцияға жібереді, сондықтан
+    robots.txt статикалық файл емес, маршрут ретінде беріледі — әйтпесе
+    іздеу роботы оның орнына басты беттің HTML-ін алар еді.
+    """
+    return Response(content=ROBOTS_TXT, media_type="text/plain; charset=utf-8")
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    urls = []
+    for loc, priority in SITEMAP_PAGES:
+        urls.append(
+            "  <url>\n"
+            f"    <loc>{ORIGIN}{loc}</loc>\n"
+            "    <lastmod>2026-08-26</lastmod>\n"
+            "    <changefreq>weekly</changefreq>\n"
+            f"    <priority>{priority}</priority>\n"
+            "  </url>\n"
+        )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "".join(urls)
+        + "</urlset>\n"
+    )
+    return Response(content=body, media_type="application/xml")
+
+
+def _brand_asset(name: str, media_type: str):
+    path = STATIC_DIR / name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Файл табылмады")
+    return FileResponse(path, media_type=media_type)
+
+
+@app.get("/favicon.svg")
+def favicon_svg():
+    return _brand_asset("favicon.svg", "image/svg+xml")
+
+
+@app.get("/og-image.png")
+def og_image():
+    """Сілтеме бөліскенде көрінетін сурет (1200x630)."""
+    return _brand_asset("og-image.png", "image/png")
+
+
+@app.get("/apple-touch-icon.png")
+def apple_touch_icon():
+    return _brand_asset("apple-touch-icon.png", "image/png")
+
+
 @app.get("/media/{event_id}/{filename}")
 def get_media(event_id: str, filename: str):
     path = (MEDIA_DIR / event_id / filename).resolve()

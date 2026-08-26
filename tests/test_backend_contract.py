@@ -56,9 +56,18 @@ class DatabaseContractTests(unittest.TestCase):
         self.db_path = Path(self.tempdir.name) / "aiqyn-test.db"
         self.db_patch = patch.object(db, "DB_PATH", self.db_path)
         self.db_patch.start()
+        # init_db() бос дерекқорға демо snapshot-ты автоматты жүктейді
+        # (portal/db.py::_load_demo_if_empty) — бұл Vercel-дегі суық старт
+        # үшін керек. Тестке ол керек емес: бұл жерде дерекқор шынымен
+        # бос болуы тиіс, әйтпесе аймақ тізімі демо деректерімен басталады.
+        self.demo_patch = patch.object(
+            db, "DEMO_SNAPSHOT", Path(self.tempdir.name) / "no-demo.json"
+        )
+        self.demo_patch.start()
         db.init_db()
 
     def tearDown(self):
+        self.demo_patch.stop()
         self.db_patch.stop()
         self.tempdir.cleanup()
 
