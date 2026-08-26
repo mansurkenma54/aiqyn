@@ -1,0 +1,36 @@
+name: 💡 Feature request / Идея
+description: Жаңа мүмкіндік ұсыну / Suggest an idea
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Қандай мәселені шешеді? / What problem does this solve?
+      description: Мүмкіндіктің өзінен бұрын мәселені сипаттаңыз.
+      placeholder: Мұғалім әр сыныпты бөлек ашуға мәжбүр, сондықтан...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Ұсынылатын шешім / Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Басқа қарастырған нұсқалар / Alternatives considered
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Көлемі / Size
+      options:
+        - Кішкентай — бір бет немесе бір компонент
+        - Орташа — бірнеше модуль
+        - Үлкен — архитектураға әсер етеді
+    validations:
+      required: true

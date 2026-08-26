@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Syntax · contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # The portal has no ML dependencies on purpose, so CI installs only the
+      # light requirement set. Pulling ultralytics would drag in torch (~2 GB)
+      # for tests that never touch a model.
+      - name: Install portal dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-portal.txt
+
+      - name: Syntax check every module (vision included)
+        run: python -m compileall -q vision portal api scripts
+
+      - name: Backend contract tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Fail if a secret pattern reached the tree
+        run: |
+          if grep -rInE '(AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,})' \
+             --exclude-dir=.git --exclude='*.example' . ; then
+            echo "::error::possible secret committed"
+            exit 1
+          fi
