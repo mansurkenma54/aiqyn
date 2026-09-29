@@ -158,6 +158,22 @@ def cmd_doctor(cfg: Config) -> int:
         print(f"          Түзету:  python scripts/fetch_weights.py")
         problems += 1
 
+    # Есептеу құрылғысы: Intel графикасы бар болса, талдау 3,6 есе жылдам
+    try:
+        import openvino
+        devices = openvino.Core().available_devices
+        if "GPU" in devices:
+            name = openvino.Core().get_property("GPU", "FULL_DEVICE_NAME")
+            print(f"   {OK} Есептеу: {name}")
+            print(f"          Талдау процессорға қарағанда ~3,6 есе жылдам")
+        else:
+            print(f"   {WARN} Intel графикасы табылмады — талдау процессорда жүреді")
+    except ImportError:
+        print(f"   {WARN} openvino орнатылмаған — талдау процессорда жүреді (3,6 есе баяу)")
+        print(f"          Түзету:  pip install openvino onnx onnxslim")
+    except Exception as exc:
+        print(f"   {WARN} Есептеу құрылғысын анықтау мүмкін болмады: {exc}")
+
     # --- 3. Шрифт ---
     print("\n3) Интерфейс шрифті (қазақ әріптері үшін)")
     from .overlay import FONT_CANDIDATES
@@ -406,8 +422,18 @@ def build_parser() -> argparse.ArgumentParser:
                      help="терезесіз режим")
     run.add_argument("--fast", dest="file_realtime", action="store_false", default=None,
                      help="видеофайлды нақты уақыт жылдамдығын күтпей, барынша тез өңдеу")
+    run.add_argument("--lanes", dest="draw_lanes", action="store_true", default=None,
+                     help="кадрға жол сызықтарын салу (әдепкіде салынбайды)")
     run.add_argument("--no-lanes", dest="draw_lanes", action="store_false", default=None,
-                     help="жол сызықтарын салмау")
+                     help="жол сызықтарын салмау (әдепкі)")
+    run.add_argument("--road-only", dest="road_only", action="store_true", default=None,
+                     help="ақауды тек жол бетінен іздеу (шын ақауларды да тастап жіберуі мүмкін)")
+    run.add_argument("--sync", dest="async_detect", action="store_false", default=None,
+                     help="талдауды негізгі циклде жүргізу (ескі, баяу режим)")
+    run.add_argument("--no-tile", dest="tile_detect", action="store_false", default=None,
+                     help="дәлдеу режимін өшіру (жылдамырақ, бірақ аз табады)")
+    run.add_argument("--detect-hz", dest="detect_max_hz", type=float, default=None,
+                     help="секундына ең көп неше талдау (0 = шектеусіз)")
     run.add_argument("--no-flood", dest="enable_flood", action="store_false", default=None)
     run.add_argument("--no-lights", dest="enable_streetlight", action="store_false", default=None)
     run.add_argument("--log", dest="log_level", default=None,

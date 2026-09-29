@@ -30,6 +30,7 @@ class VideoFileSource(VideoSource):
         self._fps = 25.0
         self._counter = 0
         self._start_wall = 0.0
+        self.total_frames = 0
 
     def open(self) -> None:
         if not self.path.exists():
@@ -44,6 +45,7 @@ class VideoFileSource(VideoSource):
             self._fps = float(fps)
 
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        self.total_frames = max(0, total)
         self._cap = cap
         self._start_wall = time.time()
         log.info(
@@ -68,6 +70,10 @@ class VideoFileSource(VideoSource):
             delay = target - time.time()
             if delay > 0:
                 time.sleep(min(delay, 0.5))
+            elif delay < -1.0:
+                # Кідірістен (пауза, жүйенің тежелуі) кейін видео «жеделдетіп»
+                # қуып жетуге тырыспауы керек — уақыт шкаласын қайта негіздейміз
+                self._start_wall = time.time() - (self._counter / self._fps)
 
         # Уақыт белгісі ВИДЕОНЫҢ өз уақыт шкаласымен жүреді (нақты
         # сағатпен емес). Сонда --fast режимінде де GPS трегі кадрмен

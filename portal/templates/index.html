@@ -3,149 +3,739 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#050506">
-  <meta name="description" content="AIQYN — Шымкент қаласының жол инфрақұрылымын компьютерлік көру арқылы автоматты бақылайтын жүйе.">
-  <title>AIQYN — Шымкент жолдарын AI бақылайды</title>
+  <meta name="theme-color" content="#0b0b0c">
+  <meta name="description" content="AIQYN ZHOL — қалада қазірдің өзінде жүрген қызметтік көліктердің камерасын жол ақауын автоматты табатын жүйеге айналдырады. Жаңа камера қоймаймыз — бағдарлама қосамыз.">
+  <title>AIQYN ZHOL — жол шағымды күтпеуі керек</title>
 
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/static/landing.css">
-  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="preload" href="/static/vendor/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/vendor/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/site.css">
+  <link rel="stylesheet" href="/static/hud.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="canonical" href="https://aiqyn-alpha.vercel.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AIQYN">
+  <meta property="og:locale" content="kk_KZ">
+  <meta property="og:title" content="AIQYN — жол шағымды күтпеуі керек">
+  <meta property="og:description" content="Камера жол ақауын өзі табады, дәлелін жинайды және ресми өтінімді дайындайды. Оператор тексеріп, 109-ға жібереді.">
+  <meta property="og:url" content="https://aiqyn-alpha.vercel.app/">
+  <meta property="og:image" content="https://aiqyn-alpha.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="AIQYN — жол ақауын автоматты бақылау">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://aiqyn-alpha.vercel.app/og-image.png">
 </head>
 <body>
 
-<nav class="nav" aria-label="Басты мәзір">
-  <a class="brand" href="/" aria-label="AIQYN басты беті">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <span class="brand-copy"><strong>AIQYN</strong><span>Шымкент</span></span>
-  </a>
-  <div class="nav-links">
-    <a href="#features">Мүмкіндіктер</a>
-    <a href="#process">Қалай жұмыс істейді</a>
-    <a href="#live">Көрсеткіштер</a>
-  </div>
-  <a class="btn btn-primary" href="/portal">Порталды ашу <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-</nav>
+<a class="skip-link" href="#main">Негізгі мазмұнға өту</a>
 
-<header class="hero">
-  <p class="eyebrow reveal">Компьютерлік көру · ЕКЦ 109 · Шымкент</p>
-  <h1 class="reveal">Жолдағы ақауды<br><span class="grad">AI өзі тауып,</span> өтінімді дайындайды</h1>
-  <p class="sub reveal">Камера жазбасынан шұңқыр мен жарықшақты анықтап, дәлелді фотосы, координатасы және
-    ресми мәтіні дайын өтінімді оператордың алдына қояды. Оператор тексеріп, бір батырмамен ЕКЦ 109-ға жібереді.</p>
-  <div class="cta-row reveal">
-    <a class="btn btn-primary btn-lg" href="/portal">Оператор порталын ашу <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-    <a class="btn btn-ghost btn-lg" href="#features">Мүмкіндіктерді көру</a>
+<div class="boot" id="boot" aria-hidden="true">
+  <div class="boot-lockup">
+    <div class="boot-mark">__LOGO_BIG__</div>
+    <div class="boot-word"><span><b>AI</b>qyn zhol</span></div>
   </div>
+  <div class="boot-in">
+    <div class="boot-sub">Шымкент · Road Intelligence</div>
+  </div>
+</div>
 
-  <div class="hero-visual reveal" aria-label="Оператор порталының көрінісі">
-    <div class="browser-frame">
-      <div class="browser-bar"><span></span><span></span><span></span><em>portal.aiqyn — инфрақұрылым картасы</em></div>
-      <img src="/static/hero-portal.jpg" alt="AIQYN оператор порталы: оқиғалар тізімі және Шымкент картасы" width="1600" height="1000">
-    </div>
+<div class="scroll-progress" id="progress"></div>
+
+<header class="hdr" id="hdr">
+  <div class="wrap">
+    <a class="brand" href="/">__LOGO_SM__<b>AI<i>qyn zhol</i></b></a>
+    <nav class="nav" aria-label="Бөлімдер">
+      <a href="#problem">Мәселе</a>
+      <a href="#ready">Идея</a>
+      <a href="#how">Үш саты</a>
+      <a href="#proof">Дәлел</a>
+      <a href="#center">Карта</a>
+    </nav>
+    <a class="btn btn-invert" href="/portal">Оператор картасы <span class="ar">→</span></a>
   </div>
 </header>
 
-<section class="stats-band" id="live" aria-label="Жүйе көрсеткіштері">
-  <p class="eyebrow">Қазіргі жағдай · тірі дерек</p>
-  <div class="stats-grid" id="landing-stats">
-    <div class="stat-tile"><b data-key="total">—</b><span>Барлық оқиға</span></div>
-    <div class="stat-tile alert"><b data-key="pending_review">—</b><span>Тексеруді күтуде</span></div>
-    <div class="stat-tile"><b data-key="sent">—</b><span>ЕКЦ 109-ға жіберілді</span></div>
-    <div class="stat-tile work"><b data-key="in_progress">—</b><span>Жұмыс жүргізілуде</span></div>
-  </div>
-</section>
+<main id="main">
 
-<section class="features" id="features">
-  <p class="eyebrow reveal">Мүмкіндіктер</p>
-  <h2 class="reveal">Ақаудың пайда болуынан жабылуына дейін — бір жүйеде</h2>
-  <div class="feature-grid">
-    <article class="feature-card reveal">
-      <span class="feature-icon"><i class="fa-solid fa-eye" aria-hidden="true"></i></span>
-      <h3>AI анықтау</h3>
-      <p>Жергілікті модель кадрдан шұңқыр, торлы/бойлық/көлденең жарықшақ, су басу және жарықтандыру ақауларын сенімділік бағасымен табады.</p>
-    </article>
-    <article class="feature-card reveal">
-      <span class="feature-icon amber"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
-      <h3>Оператор бақылауы</h3>
-      <p>AI ешнәрсені өзі жібермейді. Әр өтінім — тек жоба; оператор фотоны, орынды және мәтінді тексеріп қана растайды.</p>
-    </article>
-    <article class="feature-card reveal">
-      <span class="feature-icon blue"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i></span>
-      <h3>ЕКЦ 109 интеграциясы</h3>
-      <p>Расталған өтінім ресми форматта жіберіледі, билет нөмірі сақталады, Word/PDF құжаты автоматты қалыптасады.</p>
-    </article>
-    <article class="feature-card reveal">
-      <span class="feature-icon green"><i class="fa-solid fa-road" aria-hidden="true"></i></span>
-      <h3>Жол учаскелері картасы</h3>
-      <p>Жөндеу жүріп жатқан және жабық учаскелер картада сары/қызыл сызықпен белгіленеді — AI олардағы ескі ақауларды қайта жібермейді.</p>
-    </article>
-  </div>
-</section>
+<!-- ═════════ HERO ═════════ -->
+<section class="hero screen">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow" data-seq="1"><span class="dot"></span>Шымкент · жол интеллектісі</span>
 
-<section class="process" id="process">
-  <p class="eyebrow reveal">Қалай жұмыс істейді</p>
-  <h2 class="reveal">Үш қадам — толық цикл</h2>
-  <div class="steps">
-    <div class="step reveal">
-      <span class="step-num">01</span>
-      <h3>Камера жазады</h3>
-      <p>Видеорегистратор жолды түсіріп отырады. AIQYN Vision кадр сайын модельге өткізеді.</p>
+      <h1 class="h-hero">
+        <span class="rl" data-seq="2"><span>Жол шағымды</span></span>
+        <span class="rl" data-seq="3"><span><em>күтпеуі керек.</em></span></span>
+      </h1>
+
+      <p class="lead" data-seq="4">
+        Жолды талап деңгейінде ұстау үшін оны үнемі көріп отыру керек. Қаланы
+        күн сайын аралайтын қызметтік көліктерде камера бұрыннан бар — біз
+        оларға <strong>көретін бағдарлама қосамыз.</strong>
+      </p>
+
+      <div class="hero-actions" data-seq="5">
+        <a class="btn btn-primary btn-lg" href="/portal">Картаны ашу <span class="ar">→</span></a>
+        <a class="btn btn-ghost btn-lg" href="#how">Қалай жұмыс істейді</a>
+      </div>
+
+      <div class="hero-proof" data-seq="6">
+        <span><i>✓</i>Жаңа жабдық қажет емес</span>
+        <span class="a"><i>●</i>Дәлелі бар әр ақау</span>
+        <span class="t"><i>▣</i>Соңғы шешім — адамда</span>
+      </div>
     </div>
-    <div class="step reveal">
-      <span class="step-num">02</span>
-      <h3>AI өтінім жобасын дайындайды</h3>
-      <p>Ақау табылса — дәлелді фото, GPS координата, мекенжай және ресми мәтін автоматты қалыптасады.</p>
-    </div>
-    <div class="step reveal">
-      <span class="step-num">03</span>
-      <h3>Оператор растап, жібереді</h3>
-      <p>Порталда бір батырма — өтінім ЕКЦ 109-ға. Орындалған соң before/after фотомен жабылады.</p>
+
+    <div data-seq="4" class="hero-media">
+      <div class="frame" id="heroFrame">
+        <video id="heroVideo" poster="/static/video/hero-night.jpg"
+               autoplay muted loop playsinline preload="none"
+               data-src="/static/video/hero-night.mp4"
+               data-src-sm="/static/video/hero-night-sm.mp4"
+               aria-label="Түнде жол бойымен келе жатқан қызметтік көлік; жүйе жол ақауын белгілеп өтеді"></video>
+        <div class="scan on"><i></i></div>
+        <span class="br tl"></span><span class="br tr"></span>
+        <span class="br bl"></span><span class="br rb"></span>
+      </div>
+
+      <!-- Карточка кадрдың АСТЫНДА — суретті жаппайды -->
+      <div class="ev-strip">
+        <div class="ev-main">
+          <span class="ev-id">AIQYN-20260814-211340-77c8b6</span>
+          <span class="ev-t">Жол жабынының ақауы — шұңқыр</span>
+        </div>
+        <dl class="ev-data">
+          <div><dt>Мекенжай</dt><dd>Шамалған к-сі, 34а</dd></div>
+          <div><dt>Сенімділік</dt><dd class="hot">74%</dd></div>
+          <div><dt>Күйі</dt><dd>Тексеруде</dd></div>
+        </dl>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="cta-band">
-  <h2 class="reveal">Қала жолдары — бақылауда</h2>
-  <p class="reveal">Оператор порталы қазір жұмыс істеп тұр.</p>
-  <a class="btn btn-primary btn-lg reveal" href="/portal">Порталды ашу <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+<!-- ═════════ САНДАР ═════════ -->
+<div class="metrics rv" id="metrics">
+  <div>
+    <strong data-to="1308120">0</strong>
+    <span>Шымкент тұрғыны</span>
+    <span class="src">Ұлттық статистика бюросы · 01.06.2026</span>
+  </div>
+  <div>
+    <strong data-to="3846.7" data-dec="1" data-suf=" км">0</strong>
+    <span>қаланың жол қоры</span>
+    <span class="src">Шымкент әкімдігі · жол басқармасы</span>
+  </div>
+  <div>
+    <strong data-to="15" data-suf=" сек">0</strong>
+    <span>кадрдан дайын өтінімге дейін</span>
+    <span class="src">медиана · 62 нақты оқиға бойынша өлшенді</span>
+  </div>
+  <div>
+    <strong data-to="0" data-suf=" ₸">0</strong>
+    <span>жаңа камераға шығын</span>
+    <span class="src">бар камералар қолданылады</span>
+  </div>
+</div>
+
+<!-- ═════════ МӘСЕЛЕ ═════════ -->
+<section class="sec-surface screen" id="problem">
+  <div class="wrap">
+    <div class="sec-head sec-head--wide rv">
+      <span class="eyebrow"><span class="dot"></span>Мәселе</span>
+      <h2 class="h-xl" style="margin-top:24px">Жолдың стандарты бар.<br><em>Оны ұстап тұратын көз жоқ.</em></h2>
+      <p class="lead" style="margin-top:22px">
+        Жолды жыл сайын жөндейміз, бірақ оның күйін <strong>күн сайын ешкім
+        көрмейді</strong>. Ал қозғалыс тығыз — жаңа жол да тез тозады.
+      </p>
+    </div>
+
+    <div class="bento">
+      <div class="tile red span-2 rv">
+        <span class="ic">01</span>
+        <h3 class="h-s">Тозу үнсіз жүреді</h3>
+        <p class="body">Ұсақ жарықшақ көзге түспейді. Су кіріп, аяз ұрып, ол айлап
+          келе шұңқырға айналады.</p>
+      </div>
+      <div class="tile red span-2 rv d1">
+        <span class="ic">02</span>
+        <h3 class="h-s">Кеш білеміз</h3>
+        <p class="body">Ақау туралы қала біреу шағымданғанда естиді. Ол уақытта
+          жөндеу әлдеқайда қымбат.</p>
+      </div>
+      <div class="tile red span-2 rv d2">
+        <span class="ic">03</span>
+        <h3 class="h-s">Қолмен қарау жетпейді</h3>
+        <p class="body">Мыңдаған километр жолды жаяу да, көзбен де тұрақты
+          тексеріп шығу мүмкін емес.</p>
+      </div>
+    </div>
+
+  </div>
 </section>
 
-<footer class="footer">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <span class="brand-copy"><strong>AIQYN</strong><span>Шымкент</span></span>
+<!-- ═════════ КИБЕР ШЕРИФ — сол жақта видео, оң жақта мәтін ═════════ -->
+<section class="sec-surface screen" id="ready">
+  <div class="wrap">
+    <div class="ready-grid">
+      <!-- Видео скроллмен басқарылады: төмен түссең — алға, жоғары
+           көтерілсең — кері. Бөлім толық ашылғанда камераға дейінгі
+           жақындау АЯҚТАЛҒАН болуы керек. -->
+      <figure class="shot rv" id="bandProblem" data-scrub>
+        <video src="/static/video/patrol-scrub.mp4" poster="/static/video/patrol-wide.jpg"
+               muted playsinline preload="metadata"
+               aria-label="Қызметтік көліктің дабыл шамындағы камера"></video>
+
+        <svg class="shot-call" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <path class="cl-line" d="M200 104 L262 62 L332 62"/>
+          <circle class="cl-dot" cx="200" cy="104" r="5"/>
+          <circle class="cl-ring" cx="200" cy="104" r="5"/>
+        </svg>
+        <span class="shot-tag">
+          <b>Камера</b>
+          <i>дабыл шамының ішінде</i>
+        </span>
+        <span class="shot-progress"><i></i></span>
+      </figure>
+
+      <div class="ready-copy rv d1">
+        <span class="eyebrow"><span class="dot"></span>Дайын платформа</span>
+        <h2 class="h-l" style="margin-top:22px">Орнатылады да,<br><em>бірден жұмыс істейді.</em></h2>
+        <p class="lead" style="margin-top:22px">
+          Кибер Шериф — қаланың қолданыстағы жүйесі. Камерасы да, көлігі де,
+          маршруты да бар. AIQYN сол дайын платформаға қосылады.
+        </p>
+        <ul class="facts">
+          <li><i>✓</i><span>Полицияға <strong>артық жұмыс жоқ</strong> — ешкім тоқтамайды, ештеңе толтырмайды</span></li>
+          <li><i>✓</i><span>Кезекшілік әдеттегідей жүреді, жүйе сол кезде-ақ ақауды тауып отырады</span></li>
+          <li><i>✓</i><span>Жаңа жабдық сатып алудың да, жаңа маршрут құрудың да қажеті жоқ</span></li>
+        </ul>
+      </div>
+    </div>
   </div>
-  <p>Шымкент қаласының инфрақұрылымын AI арқылы автоматты бақылау жүйесі · 2026</p>
+</section>
+
+<!-- ═════════ ҮШ САТЫ — физикалық іздеу → ЖИ сүзгісі → адам ═════════ -->
+<section class="screen" id="how">
+  <div class="wrap">
+    <div class="sec-head sec-head--wide rv">
+      <span class="eyebrow"><span class="dot"></span>Үш саты</span>
+      <h2 class="h-l" style="margin-top:22px">Жүйе табады.<br><em>Адам тек растайды.</em></h2>
+      <p class="lead">
+        Өтінімді адам толтырмайды. Камерадан шыққан әр ақау үш сүзгіден өтіп,
+        операторға дәлелі мен мәтіні дайын күйінде келеді.
+      </p>
+    </div>
+
+    <ol class="steps rv d1" style="list-style:none;margin:0;padding:0">
+      <li class="step">
+        <span class="n">01</span>
+        <h3 class="h-s">Көлікте табу</h3>
+        <p class="body">Кадр құрылғының өзінде талданады: физикалық детектор
+          күңгірт ойық пен сынық жиекті іздейді, жол ақауының нейрожелісі
+          оны қайта қарайды. Желіге бүкіл видео емес, тек ақау табылған кадр кетеді.</p>
+      </li>
+      <li class="step">
+        <span class="n">02</span>
+        <h3 class="h-s">ЖИ сүзгісі</h3>
+        <p class="body">Жасанды интеллект (ЖИ) сарапшысы көлеңкені, жапырақты, шалшықты және ескі жамауды
+          алып тастайды. Ақаудың шамамен өлшемін, қауіп деңгейін және жөндеу мерзімін жазады.</p>
+      </li>
+      <li class="step">
+        <span class="n">03</span>
+        <h3 class="h-s">Дайын құжат</h3>
+        <p class="body">GPS координатасы, мекенжай, 2ГИС, Google және OSM сілтемелері,
+          8 секундтық видео, фото және қазақша-орысша ресми мәтін автоматты жиналады.</p>
+      </li>
+      <li class="step human">
+        <span class="n">04</span>
+        <h3 class="h-s">Оператор растайды</h3>
+        <p class="body">Оператор кезектегі ақауды видео бойынша бір батырмамен растайды
+          немесе себебін жазып жоққа шығарады. Жоққа шығарылғандары модельді
+          жетілдіруге жиналады.</p>
+      </li>
+    </ol>
+
+    <ul class="facts rv d2" style="max-width:62ch">
+      <li><i class="warn">!</i><span><strong>Қауіпті ақау кезек күтпейді.</strong> Терең шұңқыр
+        тізімнің басына шығады. Операторсыз бірден 109-ға жіберу режимі
+        техникалық дайын, әкімдікпен келісілгеннен кейін қосылады.</span></li>
+    </ul>
+
+    <span class="eyebrow rv d2" style="margin-top:40px"><span class="dot"></span>Қосылатын камералар</span>
+    <div class="chips rv d2" aria-label="Қосылатын камералар" style="margin-top:16px">
+      <span class="chip">Кибер Шериф экипаждары</span>
+      <span class="chip">Жедел жәрдем</span>
+      <span class="chip">Қалалық автобустар</span>
+      <span class="chip">Коммуналдық техника</span>
+      <span class="chip muted">Sergek стационар камералары · пилотта</span>
+      <span class="chip muted">Дрон · пилотта</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ НЕ КӨРЕДІ ═════════ -->
+<section class="sec-surface screen" id="proof">
+  <div class="wrap">
+    <div class="sec-head sec-head--wide rv">
+      <span class="eyebrow"><span class="dot"></span>Не көреді</span>
+      <h2 class="h-l" style="margin-top:22px">Адам өтіп кетеді.<br><em>Жүйе тоқтап қарайды.</em></h2>
+    </div>
+
+    <div class="media-col">
+      <div class="rev rv d1" id="rev">
+        <img src="/static/road-before.jpg" width="1600" height="900" loading="lazy"
+             alt="Шымкент маңындағы жол — камерадан шыққан өңделмеген кадр">
+        <div class="rev-over">
+          <img src="/static/road-after.jpg" width="1600" height="900" loading="lazy"
+               alt="Сол кадр: жүйе екі ақауды тауып, рамкамен белгілеген">
+        </div>
+        <span class="rev-tag l">Камера</span>
+        <span class="rev-tag r">AIQYN</span>
+        <div class="rev-bar"></div>
+      </div>
+
+      <div class="frame-meta rv d2">
+        <span class="rec">Тұтқаны сүйреңіз</span>
+        <span class="sep">Осы кадрда екі ақау табылған</span>
+      </div>
+
+      <div class="chips rv d2">
+        <span class="chip">Шұңқыр</span>
+        <span class="chip">Торлы жарықшақ</span>
+        <span class="chip">Көлденең жарықшақ</span>
+        <span class="chip">Бойлық жарықшақ</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ ДАЛАЛЫҚ ДӘЛЕЛ ═════════ -->
+<section class="screen">
+  <div class="wrap">
+    <div class="sec-head sec-head--wide rv">
+      <span class="eyebrow"><span class="dot"></span>Далалық тест</span>
+      <h2 class="h-l" style="margin-top:22px">Бұл — көрсетілім емес.<br><em>Нақты рейс.</em></h2>
+    </div>
+
+    <div class="split split--top">
+      <div class="rv">
+        <div class="frame frame--portrait" data-hud>
+          <video src="/static/video/field-test.mp4" poster="/static/video/field-test.jpg"
+                 autoplay muted loop playsinline preload="none"
+                 aria-label="Телефон әйнекке бекітілген, экранда AIQYN ақауды тауып тұр"></video>
+          <span class="br tl"></span><span class="br tr"></span>
+          <span class="br bl"></span><span class="br rb"></span>
+        </div>
+      </div>
+
+      <div class="rv d2">
+        <p class="lead" style="margin-bottom:26px">
+          Тест кезінде көлік Шымкент көшелерімен жүріп өтті, ал жүйе ақауларды
+          өзі тауып, әрқайсысына дәлел жинады.
+        </p>
+        <ul class="facts" style="margin-top:0">
+          <li><i>01</i><span>Қосымша жабдық жоқ — қолда бар камера жеткілікті</span></li>
+          <li><i>02</i><span>Координата дәлдігі далада <strong>±6 метр</strong></span></li>
+          <li><i>03</i><span>Әр ақауға фото, видео және уақыт тіркелді</span></li>
+          <li><i>04</i><span>Байланыс үзілгенде оқиға жойылмайды, кезекте күтеді</span></li>
+          <li><i>05</i><span>Тамызда <strong>72 ақау</strong> нақты GPS координатасымен тіркелді</span></li>
+        </ul>
+
+        <div class="next-src rv d3" style="margin-top:26px">
+          <video src="/static/video/drone-dock.mp4" poster="/static/video/drone-dock.jpg"
+                 autoplay muted loop playsinline preload="none" data-lazy
+                 aria-label="Дрон станциясы ашылып, дрон ұшып шығады"></video>
+          <div>
+            <span class="tag tag--roadmap">Келесі кезең</span>
+            <b>Камера — жалғыз көз емес</b>
+            <span>Дрон мен стационар камера да сол тізбекке қосыла алады:
+              детектор да, оқиға пішімі де өзгермейді.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ КАРТА ═════════ -->
+<section class="sec-surface screen" id="center">
+  <div class="wrap">
+    <div class="map-split">
+      <div class="rv">
+        <span class="eyebrow"><span class="dot"></span>Оператор картасы</span>
+        <h2 class="h-l" style="margin-top:18px">Әр нүкте —<br>координата емес.</h2>
+        <p class="lead">
+          Дәлел, ЖИ талдауы, координата, статус және дайын өтінім — бәрі
+          бір экранда.
+        </p>
+        <a class="btn btn-primary btn-lg" href="/portal" style="margin-top:26px">
+          Толық ашу <span class="ar">→</span></a>
+      </div>
+
+      <figure class="embed embed--wide rv d1">
+        <div class="embed-frame">
+          <iframe src="/portal" loading="lazy" tabindex="-1" scrolling="no"
+                  title="AIQYN оператор картасы — тірі көрініс"></iframe>
+        </div>
+        <figcaption class="embed-cap">
+          <span>Макет емес — беттің ішінде картаның нақты нұсқасы жүктелген.</span>
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ ФИНАЛ ═════════ -->
+<section class="sec-black final screen">
+  <div class="wrap wrap-narrow">
+    <h2 class="h-xl rv">Жолдың ақауын<br>адам бірінші байқамауы керек.</h2>
+    <p class="lead rv d1" style="margin-top:26px">Қала өзі көруі керек.</p>
+    <div class="hero-actions rv d2" style="margin-top:44px">
+      <a class="btn btn-invert btn-lg" href="/portal">Оператор картасын ашу <span class="ar">→</span></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <a class="brand" href="/">__LOGO_SM__<b>AI<i>qyn zhol</i></b></a>
+    <span>Шымкенттің жол инфрақұрылымын автоматты бақылау жүйесі</span>
+    <span>Жүйе тұлғаны да, нөмірді де танымайды.</span>
+    <span>2026</span>
+  </div>
 </footer>
 
 <script>
-  // Тірі статистика
-  fetch('/api/stats').then((r) => r.json()).then((stats) => {
-    const values = {
-      total: stats.total,
-      pending_review: stats.pending_review,
-      sent: (stats.by_status && (stats.by_status.sent || stats.by_status.submitted)) || 0,
-      in_progress: (stats.by_status && stats.by_status.in_progress) || 0,
-    };
-    Object.entries(values).forEach(([key, value]) => {
-      const el = document.querySelector(`[data-key="${key}"]`);
-      if (el && value != null) el.textContent = value;
-    });
-  }).catch(() => {});
+(function () {
+  'use strict';
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Скролл кезінде жұмсақ көріну
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reduceMotion && 'IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); }
-      });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
-  } else {
-    document.querySelectorAll('.reveal').forEach((el) => el.classList.add('visible'));
+  var hv = document.getElementById('heroVideo');
+  if (hv) hv.src = innerWidth < 720 ? hv.dataset.srcSm : hv.dataset.src;
+
+  /* ==========================================================
+     Кіру реті
+     ----------------------------------------------------------
+     Класты бірден қосса, браузер бастапқы күйді сала үлгермейді
+     де, элемент анимациясыз «атып шығады». Сондықтан бәрі
+     setTimeout арқылы, өз кезегімен қосылады — фонда тұрған
+     қойындыда да орындалады (requestAnimationFrame орындалмайды).
+     ========================================================== */
+
+  var seq = [].slice.call(document.querySelectorAll('.hero [data-seq]'))
+    .sort(function (a, b) { return a.dataset.seq - b.dataset.seq; });
+
+  function playHero() {
+    if (playHero.done) return;
+    playHero.done = true;
+    var frame = document.getElementById('heroFrame');
+    if (reduce) {
+      seq.forEach(function (el) { el.classList.add('on'); });
+      if (frame) frame.classList.add('on');
+      return;
+    }
+    seq.forEach(function (el, i) {
+      setTimeout(function () { el.classList.add('on'); }, 60 + i * 130);
+    });
+    setTimeout(function () {
+      if (frame) frame.classList.add('on');
+      if (hv && hv.paused) hv.play().catch(function () {});
+    }, 520);
   }
+
+  var boot = document.getElementById('boot');
+  // Жол көздің пішінімен қиылатын сәт — иконка құралар алдында
+  if (boot && !reduce) setTimeout(function () {
+    if (boot) boot.classList.add('iconized');
+  }, 2900);
+
+  function closeBoot(delay) {
+    if (!boot || boot.classList.contains('gone')) return;
+    setTimeout(function () {
+      boot.classList.add('gone');
+      setTimeout(playHero, 300);            // сөну мен шығу жартылай беттеседі
+      setTimeout(function () { if (boot && boot.parentNode) boot.remove(); }, 1000);
+    }, delay);
+  }
+
+  var seen = false;
+  try { seen = sessionStorage.getItem('aiqyn_boot') === '1'; } catch (e) {}
+  if (reduce) {
+    if (boot) boot.remove();
+    playHero();
+  } else if (seen) {
+    if (boot) boot.remove();
+    setTimeout(playHero, 40);
+  } else {
+    try { sessionStorage.setItem('aiqyn_boot', '1'); } catch (e) {}
+    closeBoot(4700);                        // құлып толық құралып үлгерсін
+    addEventListener('click', function () { closeBoot(0); }, { once: true });
+  }
+  setTimeout(playHero, 6600);               // сақтандыру
+
+  /* ---------- Бетті ауыстырғанда да сол экран ---------- */
+  if (!reduce) {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.target || a.hasAttribute('download')) return;
+      var href = a.getAttribute('href');
+      if (!href || href.charAt(0) === '#' || /^(mailto|tel):/.test(href)) return;
+      if (a.origin && a.origin !== location.origin) return;
+      if (a.pathname === location.pathname) return;
+      e.preventDefault();
+      var over = document.createElement('div');
+      over.className = 'boot boot--leaving';
+      over.innerHTML = '<div class="boot-lockup"><div class="boot-mark">' +
+        document.querySelector('.hdr .brand svg').outerHTML +
+        '</div><div class="boot-word"><span><b>AI</b>qyn zhol</span></div></div>';
+      document.body.appendChild(over);
+      setTimeout(function () { location.href = href; }, 620);
+    });
+  }
+
+  /* ---------- Оқу барысы + хидер ---------- */
+  var progress = document.getElementById('progress'),
+      hdr = document.getElementById('hdr'), ticking = false;
+  addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      var max = document.documentElement.scrollHeight - innerHeight;
+      progress.style.width = (max > 0 ? Math.min(100, scrollY / max * 100) : 0) + '%';
+      hdr.classList.toggle('compact', scrollY > 120);
+      ticking = false;
+    });
+  }, { passive: true });
+
+  /* ---------- Скроллмен көріну ---------- */
+  var watched = [].slice.call(
+    document.querySelectorAll('.rv, .steps, .shot, .next-src, [data-hud]')
+  ).filter(function (el) { return !el.closest('.hero'); });
+
+  function reveal(el) {
+    if (el.dataset.revealed) return;
+    el.dataset.revealed = '1';
+    el.classList.add('on');
+    if (el.id === 'metrics') countUp(el);
+    // Видео тек көрінген сәтте жүктеліп, ойнай бастайды
+    var lazy = el.matches('[data-lazy]') ? [el] : el.querySelectorAll('video[data-lazy]');
+    [].forEach.call(lazy, function (v) { v.play().catch(function () {}); });
+  }
+
+  if (!('IntersectionObserver' in window) || reduce) {
+    watched.forEach(reveal);
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        reveal(e.target);
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -12% 0px' });
+    watched.forEach(function (el) { io.observe(el); });
+    setTimeout(function () { watched.forEach(reveal); }, 8000);
+  }
+
+  /* ---------- Сандардың өсуі ---------- */
+  function setNum(el, value) {
+    var dec = +(el.dataset.dec || 0);
+    var text = value.toFixed(dec);
+    if (dec) text = text.replace('.', ',');
+    var parts = text.split(',');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    el.textContent = parts.join(',') + (el.dataset.suf || '');
+  }
+  function countUp(root) {
+    [].forEach.call(root.querySelectorAll('[data-to]'), function (el, i) {
+      var to = parseFloat(el.dataset.to);
+      if (reduce || !to) { setNum(el, to); return; }
+      var done = false;
+      var finish = function () { if (!done) { done = true; setNum(el, to); } };
+      setTimeout(finish, 2600);
+      setTimeout(function () {
+        var t0 = null;
+        requestAnimationFrame(function step(t) {
+          if (done) return;
+          if (!t0) t0 = t;
+          var k = Math.min(1, (t - t0) / 1700);
+          setNum(el, to * (1 - Math.pow(1 - k, 4)));
+          if (k < 1) requestAnimationFrame(step); else done = true;
+        });
+      }, i * 80);
+    });
+  }
+
+  /* ==========================================================
+     Скроллмен басқарылатын видео
+     ----------------------------------------------------------
+     Кадр экранға кірген сәттен шыққанға дейін — видеоның басынан
+     соңына дейін. Скролл қозғалып тұрса, кадр да қозғалады;
+     жоғары көтерілсең кері жүреді. Видео өздігінен ойналмайды:
+     әр кадрын скролл шешеді.
+     ========================================================== */
+  var scrub = document.querySelector('[data-scrub]');
+  if (scrub && !reduce) {
+    var sv = scrub.querySelector('video');
+    var bar = scrub.querySelector('.shot-progress i');
+    var want = 0, seeking = false, guard = 0, playing = false, warmed = false;
+
+    /* Файл ТОЛЫҚ жүктелгенде ғана кадр іздеу желіге шықпайды — қатып
+       қалудың басты себебі осы еді. Бірақ бетті ашқан сәтте емес: бөлім
+       жақындағанда ғана, әйтпесе hero видеосымен арнаны бөлісіп,
+       беттің ашылуын баяулатады. */
+    function warm() {
+      if (warmed) return;
+      warmed = true;
+      sv.preload = 'auto';
+      sv.load();
+      // Сақтандырғыш: 8 секундта да дайын болмаса — жай ойнатамыз,
+      // экранда қатып тұрған сурет ешқашан қалмайды
+      setTimeout(function () { if (sv.readyState < 2) justPlay(); }, 8000);
+    }
+
+    // Алдыңғы іздеу бітпей тұрып жаңасын жібермейміз: әйтпесе браузерде
+    // іздеулер кезекке жиналады да, кадр қатып қалады.
+    function pump() {
+      if (playing || seeking) return;
+      if (!sv.duration || !isFinite(sv.duration)) return;
+      if (Math.abs(sv.currentTime - want) < 0.02) return;
+      seeking = true;
+      clearTimeout(guard);
+      guard = setTimeout(function () { seeking = false; pump(); }, 500);
+      try { sv.currentTime = want; } catch (e) { seeking = false; }
+    }
+
+    /* Кадр экранға кірген сәттен бастап жүреді де, бөлім ТОЛЫҚ
+       ашылғанда (кадр экранның дәл ортасында тұрғанда) соңғы кадрда
+       болады. Сондықтан камераға жақындау көз алдында аяқталады —
+       жарты жолда үзіліп қалмайды. */
+    function apply() {
+      var r = scrub.getBoundingClientRect();
+      if (!warmed && r.top < innerHeight * 2.5) warm();
+      var from = innerHeight;                       // үсті экранның төменгі шетінде
+      var to = (innerHeight - r.height) / 2;        // кадр экранның ортасында
+      var span = Math.max(1, from - to);
+      var p = Math.max(0, Math.min(1, (from - r.top) / span));
+      if (bar) bar.style.transform = 'scaleX(' + p.toFixed(3) + ')';
+      if (sv.duration && isFinite(sv.duration)) want = p * (sv.duration - 0.06);
+      pump();
+    }
+    sv.addEventListener('seeked', function () {
+      seeking = false; clearTimeout(guard); pump();
+    });
+
+    // Сақтандырғыш: қандай да бір себеппен кадр іздеу жүрмесе, видео
+    // жай ойнай береді. Экранда қатып тұрған сурет қалмайды.
+    function justPlay() {
+      if (playing) return;
+      playing = true;
+      sv.loop = true;
+      sv.play().catch(function () {});
+    }
+    sv.addEventListener('error', justPlay);
+    sv.addEventListener('loadedmetadata', apply);
+    sv.addEventListener('canplaythrough', apply);
+
+    addEventListener('scroll', apply, { passive: true });
+    addEventListener('resize', apply, { passive: true });
+
+    // Екінші драйвер: кейбір ортада scroll оқиғасы бүркемеленеді немесе
+    // сирек атылады. IntersectionObserver көптеген шекпен қосымша сигнал
+    // береді — екеуі бірге тұрғанда видео скроллдан қалмайды.
+    if ('IntersectionObserver' in window) {
+      var steps = [];
+      for (var i = 0; i <= 40; i++) steps.push(i / 40);
+      new IntersectionObserver(function () { apply(); }, { threshold: steps }).observe(scrub);
+    }
+    apply();
+  } else if (scrub) {
+    // Қозғалысты азайту режимі: бірінші кадр тұрады
+    scrub.querySelector('video').preload = 'metadata';
+  }
+
+  /* ---------- Тірі карта терезесі ---------- */
+  var embed = document.querySelector('.embed-frame');
+  if (embed) {
+    var fit = function () {
+      embed.style.setProperty('--embed-k', (embed.clientWidth / 1920).toFixed(4));
+    };
+    fit();
+    if ('ResizeObserver' in window) new ResizeObserver(fit).observe(embed);
+    else addEventListener('resize', fit, { passive: true });
+  }
+
+  /* ==========================================================
+     Камера / AIQYN тұтқасы — скроллмен ашылады
+     ----------------------------------------------------------
+     Кадр өзі ашылады: бөлім экранның ортасына келгенде AIQYN
+     көрген нәрсе ТОЛЫҚ ашылып тұрады, әрі қарай түссең — қайта
+     жабылады, жоғары көтерілсең — қайта ашылады. Тұтқаны қолмен
+     ұстасаң, басқару адамға көшеді.
+     ========================================================== */
+  var rev = document.getElementById('rev');
+  if (rev) {
+    var dragging = false, byHand = false;
+
+    function setPos(p) { rev.style.setProperty('--rp', p.toFixed(2) + '%'); }
+    function fromPointer(clientX) {
+      var r = rev.getBoundingClientRect();
+      setPos(Math.max(2, Math.min(98, (clientX - r.left) / r.width * 100)));
+    }
+    rev.addEventListener('pointerdown', function (e) {
+      dragging = true; byHand = true;
+      // Қолмен сүйрегенде тұтқа саусақтан қалмауы керек — жұмсарту өшеді
+      rev.classList.add('by-hand');
+      rev.setPointerCapture(e.pointerId); fromPointer(e.clientX);
+    });
+    rev.addEventListener('pointermove', function (e) { if (dragging) fromPointer(e.clientX); });
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      rev.addEventListener(ev, function () { dragging = false; });
+    });
+
+    /* Ашылу дәрежесі: 0 — тек камера кадры, 1 — толық AIQYN көрінісі.
+
+       Тұтқа жарқ етіп өтіп кетсе, көрермен ақауларды байқамай қалады.
+       Сондықтан кадрдың экраннан ӨТУ жолы үш бөлікке бөлінген:
+         0.00–0.45  баяу ашылады (скроллдың ең ұзын бөлігі)
+         0.45–0.72  ТОЛЫҚ ашық тұрады — қарап үлгеретін уақыт
+         0.72–0.95  жабылады
+       smoothstep қосымша: басы да, соңы да жұмсақ, секіріс жоқ. */
+    function openness() {
+      var r = rev.getBoundingClientRect();
+      var t = (innerHeight - r.top) / (innerHeight + r.height);
+      var k;
+      if (t < 0.45) k = t / 0.45;
+      else if (t < 0.72) k = 1;
+      else k = (0.95 - t) / 0.23;
+      k = Math.max(0, Math.min(1, k));
+      return k * k * (3 - 2 * k);
+    }
+    function follow() {
+      var k = openness();
+      if (k <= 0) {                    // бөлім экраннан шықты — қайта автоматқа
+        byHand = false;
+        rev.classList.remove('by-hand');
+      }
+      // 5..95: тұтқа шеттерде де толық көрініп тұрсын, қиылып қалмасын
+      if (!byHand) setPos(95 - 90 * k);
+    }
+    if (reduce) {
+      setPos(50);
+    } else {
+      // requestAnimationFrame-ге сүйенбейміз: фонда тұрған қойындыда ол
+      // шақырылмайды. Есептеу арзан, тікелей шақырған дұрыс.
+      addEventListener('scroll', follow, { passive: true });
+      addEventListener('resize', follow, { passive: true });
+      follow();
+    }
+  }
+})();
 </script>
 </body>
 </html>
-<script>/*DEBUG*/window.addEventListener('load',()=>{const de=document.documentElement, b=document.body;document.title=`deSW=${de.scrollWidth} deCW=${de.clientWidth} bSW=${b.scrollWidth} bCW=${b.clientWidth} bW=${Math.round(b.getBoundingClientRect().width)}`;});</script>

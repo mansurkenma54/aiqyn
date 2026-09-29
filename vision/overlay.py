@@ -180,6 +180,8 @@ def add_glow(image: np.ndarray, mask_layer: np.ndarray, strength: float = 1.0,
 @dataclass
 class HudStats:
     fps: float = 0.0
+    detect_fps: float = 0.0        # секундына неше кадр ТАЛДАНАДЫ (fps-тен бөлек)
+    progress: float = 0.0          # видеофайлдың қаралған үлесі (0..1)
     detections_total: int = 0
     documents_sent: int = 0
     queued: int = 0
@@ -638,3 +640,116 @@ def fit_to_width(image: np.ndarray, width: int) -> np.ndarray:
         return image
     scale = width / float(w)
     return cv2.resize(image, (width, int(h * scale)), interpolation=cv2.INTER_AREA)
+
+
+# ============================================================
+#  Тірі көрініс қабаты (қолданбадағы терезе үшін)
+# ============================================================
+
+# Экрандағы қысқа қазақша атау. categories.kk — ресми ҚҰЖАТ атауы,
+# ол тым ұзын; кадрдың үстіне сыймайды.
+LIVE_LABELS: dict[str, str] = {
+    "pothole": "ШҰҢҚЫР",
+    "crack_alligator": "ТОРЛЫ ЖАРЫҚ",
+    "crack_longitudinal": "БОЙЛЫҚ ЖАРЫҚ",
+    "crack_transverse": "КӨЛДЕНЕҢ ЖАРЫҚ",
+    "manhole_open": "АШЫҚ ЛЮК",
+    "flood": "СУ ТАСУ",
+    "obstruction": "БӨГЕТ",
+    "streetlight_out": "ЖАРЫҚ ЖАНБАЙДЫ",
+}
+
+
+class LiveHud:
+    """Қолданба терезесіндегі минималды қабат.
+
+    Бұрынғы Hud кадрға жол сызықтарын, жоғарғы қара жолақты және
+    ескерту баннерін салатын — олар жолдың өзін жауып тұрды әрі әр
+    кадрда қымбатқа түсті. Мұнда кадрға ТЕК ақаудың өзі белгіленеді,
+    қалған дерек терезенің оң жақ панелінде тұрады.
+
+    Жылдамдық: қабат ӘРҚАШАН экранға шығатын КІШІРЕЙТІЛГЕН кадрға
+    салынады (1080p емес, ~960px), сондықтан бір кадрға 2-3 мс кетеді.
+    """
+
+    def __init__(self, show_labels: bool = True):
+        self.show_labels = show_labels
+
+    def render(
+        self,
+        image: np.ndarray,
+        detections: list[Detection],
+        scale: float = 1.0,
+    ) -> np.ndarray:
+        """image — экранға шығатын кадр; scale — bbox координаталарының
+        көбейткіші (түпнұсқа кадрдан кішірейтілгенде керек)."""
+        if not detections:
+            return image
+
+        canvas = image
+        height, width = canvas.shape[:2]
+        k = max(0.6, min(2.0, width / 960.0))
+        border = max(2, int(3 * k))
+        text = TextLayer() if self.show_labels else None
+
+        # Ең жақыны (кадрда ең төмені) бірінші тұрады
+        ordered = sorted(detections, key=lambda d: -d.bbox[3])
+
+        for det in ordered:
+            x1 = int(det.bbox[0] * scale)
+            y1 = int(det.bbox[1] * scale)
+            x2 = int(det.bbox[2] * scale)
+            y2 = int(det.bbox[3] * scale)
+            x1, x2 = max(0, min(width - 1, x1)), max(0, min(width - 1, x2))
+            y1, y2 = max(0, min(height - 1, y1)), max(0, min(height - 1, y2))
+            if x2 - x1 < 4 or y2 - y1 < 4:
+                continue
+
+            color = categories.get(det.class_key).color
+
+            # 1) Жеңіл ішкі бояу — ақау көзге бірден түседі, бірақ
+            #    жол бетінің өзі көрініп тұрады
+            roi = canvas[y1:y2, x1:x2]
+            tint = np.full_like(roi, color, dtype=np.uint8)
+            cv2.addWeighted(tint, 0.16, roi, 0.84, 0, dst=roi)
+
+            # 2) Бұрыштық жақшалар — толық рамкаға қарағанда ақауды
+            #    жаппайды, әрі кәсіби құрал көрінісін береді
+            arm_x = max(6, int((x2 - x1) * 0.22))
+            arm_y = max(6, int((y2 - y1) * 0.22))
+            for (cx, cy), (dx, dy) in (
+                ((x1, y1), (1, 1)), ((x2, y1), (-1, 1)),
+                ((x1, y2), (1, -1)), ((x2, y2), (-1, -1)),
+            ):
+                cv2.line(canvas, (cx, cy), (cx + dx * arm_x, cy), color,
+                         border, cv2.LINE_AA)
+                cv2.line(canvas, (cx, cy), (cx, cy + dy * arm_y), color,
+                         border, cv2.LINE_AA)
+
+            # 3) Жіңішке толық рамка — жақшалардың арасын байланыстырады
+            cv2.rectangle(canvas, (x1, y1), (x2, y2), color,
+                          max(1, border // 2), cv2.LINE_AA)
+
+            if text is None:
+                continue
+
+            label = LIVE_LABELS.get(det.class_key, categories.get(det.class_key).short)
+            caption = f"{label}  {det.confidence * 100:.0f}%"
+            font_size = max(11, int(15 * k))
+            pad_x, pad_y = int(9 * k), int(5 * k)
+            tw, th = text.measure(caption, font_size, bold=True)
+            chip_w, chip_h = tw + pad_x * 2, th + pad_y * 2
+
+            # Рамканың үстіне; орын болмаса — ішіне
+            chip_x = max(0, min(x1, width - chip_w))
+            chip_y = y1 - chip_h - int(3 * k)
+            if chip_y < 0:
+                chip_y = min(height - chip_h, y1 + int(3 * k))
+
+            rounded_rect(canvas, (chip_x, chip_y),
+                         (chip_x + chip_w, chip_y + chip_h),
+                         color, radius=max(2, int(3 * k)), thickness=-1)
+            text.add((chip_x + chip_w // 2, chip_y + chip_h // 2), caption,
+                     size=font_size, color=WHITE, bold=True, anchor="mm")
+
+        return text.flush(canvas) if text is not None else canvas

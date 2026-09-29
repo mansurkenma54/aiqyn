@@ -1,0 +1,238 @@
+/* ============================================================
+   AIQYN — аналитика беті
+   ------------------------------------------------------------
+   ТЗ талабы: «Жол инфрақұрылымын басқару тиімділігін арттыру үшін
+   аналитика мен есептілікті қалыптастыру».
+
+   Ұстаным: сан — мәтінмен емес, пішінмен айтылады. Әр диаграмма
+   бір ғана сұраққа жауап береді.
+   ============================================================ */
+
+.an-body { overflow: auto; background: var(--bg); }
+.an-body .topbar { position: sticky; top: 0; }
+
+.an-wrap {
+  max-width: 1240px; margin: 0 auto; padding: 28px 20px 72px;
+  opacity: 0; transform: translateY(14px);
+  transition: opacity .5s var(--ease), transform .5s var(--ease);
+}
+.an-wrap.on { opacity: 1; transform: none; }
+
+.an-loading {
+  display: grid; place-items: center; gap: 12px;
+  min-height: 50vh; color: var(--muted); font-size: 13.5px;
+}
+
+.an-head { margin-bottom: 26px; }
+.an-head h1 { margin: 4px 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -.03em; }
+.an-sub { margin: 0; max-width: 62ch; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+
+/* ---------- KPI ---------- */
+.an-kpis {
+  display: grid; gap: 12px; margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.an-kpi {
+  padding: 18px 20px 20px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  transition: border-color .18s var(--ease), transform .18s var(--ease);
+}
+.an-kpi:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+.an-kpi > span {
+  display: block; margin-bottom: 8px;
+  color: var(--muted-2); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.an-kpi b {
+  display: block; font-size: 30px; font-weight: 700; letter-spacing: -.03em;
+  line-height: 1; font-variant-numeric: tabular-nums;
+}
+.an-kpi small { display: block; margin-top: 6px; color: var(--muted); font-size: 11.5px; }
+
+/* ---------- Карточкалар ---------- */
+.an-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.an-card {
+  padding: 20px 22px 24px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.an-card--wide { grid-column: 1 / -1; }
+.an-card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 650; letter-spacing: -.015em; }
+.an-note { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+/* ---------- Жолақ диаграмма ---------- */
+.an-bars { display: grid; gap: 9px; }
+.an-bar {
+  display: grid; grid-template-columns: minmax(96px, 168px) 1fr 36px;
+  gap: 12px; align-items: center; font-size: 12.5px;
+}
+.an-bar-key {
+  color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.an-bar-track {
+  height: 8px; border-radius: 6px; background: var(--fill); overflow: hidden;
+}
+.an-bar-track i {
+  display: block; height: 100%; width: 0; border-radius: 6px;
+  background: var(--c, var(--blue));
+  animation: anGrow .8s var(--ease) forwards; animation-delay: var(--d, 0ms);
+}
+@keyframes anGrow { to { width: var(--w); } }
+.an-bar b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+
+/* ---------- Дөңгелек диаграмма ---------- */
+.an-donut-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.an-donut { width: 140px; height: 140px; flex: none; transform: rotate(-90deg); }
+.an-arc-bg { fill: none; stroke: var(--fill); stroke-width: 16; }
+.an-arc {
+  fill: none; stroke-width: 16; stroke-linecap: butt;
+  opacity: 0; animation: anArc .7s var(--ease) forwards; animation-delay: var(--d, 0ms);
+}
+@keyframes anArc { to { opacity: 1; } }
+.an-donut-n {
+  fill: var(--text); font: 700 24px var(--font); text-anchor: middle;
+  transform: rotate(90deg); transform-origin: 70px 70px;
+}
+.an-donut-l {
+  fill: var(--muted-2); font: 500 10px var(--font); text-anchor: middle;
+  transform: rotate(90deg); transform-origin: 70px 70px;
+}
+.an-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.an-legend li { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); }
+.an-legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.an-legend b { margin-left: auto; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---------- Динамика ---------- */
+.an-spark { width: 100%; height: 90px; display: block; }
+.an-spark-l {
+  fill: none; stroke: var(--cyan); stroke-width: 1.6; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 400; stroke-dashoffset: 400;
+  animation: anLine 1.4s var(--ease) .2s forwards;
+}
+@keyframes anLine { to { stroke-dashoffset: 0; } }
+.an-spark-a { fill: rgba(26, 223, 227, .12); opacity: 0; animation: anArc .8s var(--ease) .6s forwards; }
+.an-spark-x {
+  display: flex; justify-content: space-between; margin-top: 6px;
+  color: var(--muted-2); font-size: 10.5px;
+}
+.an-empty { color: var(--muted-2); font-size: 12.5px; }
+
+/* ---------- Экспорт ---------- */
+.an-export { margin-top: 12px; }
+.an-export-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.an-export code {
+  padding: 2px 6px; border-radius: 5px; background: var(--fill);
+  font-family: var(--font-mono); font-size: 11.5px;
+}
+.an-foot { margin: 22px 0 0; color: var(--muted-2); font-size: 11px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .an-bar-track i { width: var(--w); animation: none; }
+  .an-arc, .an-spark-a { opacity: 1; animation: none; }
+  .an-spark-l { stroke-dashoffset: 0; animation: none; }
+  .an-wrap { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   Жұмыс тиімділігі — басқару блогы
+   ------------------------------------------------------------
+   Беттің ең жоғарғы жағында тұрады: басшыға «неше ақау бар»
+   емес, «жүйе қалай жұмыс істеп жатыр» керек.
+   ============================================================ */
+
+.an-ops { margin-bottom: 18px; }
+
+.an-ops-row {
+  display: grid; gap: 12px; margin-top: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.an-ops-cell {
+  padding: 16px 18px; border-radius: 14px;
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid rgba(255, 255, 255, .07);
+}
+/* Мерзімі өткен өтінім бар болса — блок өзі дабыл береді */
+.an-ops-cell.hot { border-color: rgba(255, 69, 58, .45); background: rgba(255, 69, 58, .08); }
+.an-ops-cell > span { display: block; font-size: 12px; color: var(--muted-2); letter-spacing: .02em; }
+.an-ops-cell > b {
+  display: block; margin: 6px 0 3px;
+  font-size: 30px; font-weight: 750; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.an-ops-cell.hot > b { color: #ff6a5a; }
+.an-ops-cell > small { font-size: 11.5px; color: var(--muted-2); }
+
+.an-ops-split {
+  display: grid; gap: 26px; margin-top: 26px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.an-ops-split h3 {
+  margin: 0 0 12px; font-size: 13px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted-2);
+}
+
+/* Кезеңдер шынжыры */
+.an-stages { display: grid; gap: 7px; }
+.an-stage { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; }
+.an-stage-n { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; text-align: right; }
+.an-stage-bar { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.an-stage-bar i { display: block; height: 100%; border-radius: 4px; background: #0a84ff; }
+.an-stage:last-child .an-stage-bar i { background: #30d158; }
+.an-stage-k { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* Жеткізу мен байлану */
+.an-facts { display: grid; gap: 12px; }
+.an-facts > div { padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.an-facts > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.an-facts span { display: block; font-size: 12px; color: var(--muted-2); }
+.an-facts b { display: block; margin: 3px 0 2px; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.an-facts b i { font-style: normal; font-size: 14px; font-weight: 500; color: var(--muted-2); }
+.an-facts small { font-size: 11.5px; color: var(--muted-2); }
+
+/* Ең ескі ашық өтінім — басуға болатын шақыру */
+.an-oldest {
+  display: block; margin-top: 16px; padding: 13px 15px; border-radius: 12px;
+  background: rgba(255, 159, 10, .09); border: 1px solid rgba(255, 159, 10, .3);
+  color: inherit; text-decoration: none;
+  transition: background .16s ease, border-color .16s ease;
+}
+.an-oldest:hover { background: rgba(255, 159, 10, .16); border-color: rgba(255, 159, 10, .55); }
+.an-oldest span { display: block; font-size: 11.5px; color: var(--muted-2); }
+.an-oldest b { display: block; margin: 2px 0; font-size: 19px; font-weight: 700; color: #ffb340; }
+.an-oldest small { font-size: 11.5px; color: var(--muted); }
+
+/* ============================================================
+   Бөлімдерге бөлінген есеп
+   ------------------------------------------------------------
+   Бұрын карточкалар бір торда араласып тұрған да, қай сан не
+   туралы екені түсініксіз болатын. Енді әр бөлімнің нөмірі,
+   тақырыбы және «бұл не үшін керек» деген жолы бар.
+   ============================================================ */
+
+.an-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+.an-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.an-sec { margin-top: 34px; }
+.an-sec-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.an-sec-n {
+  flex: 0 0 auto; min-width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 10px; background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+  font: 700 12px/1 var(--font-mono, ui-monospace); color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.an-sec-head h2 { margin: 4px 0 3px; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.an-sec-head p { margin: 0; max-width: 78ch; color: var(--muted-2); font-size: 12.5px; line-height: 1.55; }
+
+/* Бөлім ішіндегі карточка жиегі жұқа: бөлімнің өзі шекара болып тұр */
+.an-card--flat { background: rgba(255, 255, 255, .025); border-color: rgba(255, 255, 255, .06); }
+.an-card h3 {
+  margin: 0 0 12px; font-size: 13px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2);
+}
+.an-facts--row { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.an-facts--row > div { border-bottom: 0; padding-bottom: 0; }
+.an-export-row { margin-top: 16px; }
+.an-foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.07); }

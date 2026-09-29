@@ -48,16 +48,29 @@ const state = {
   selectedId: null,
   markers: {},
   knownIds: new Set(),
+  // Шешім қабылданған оқиғалар. Сервер жауабы кешігіп келсе, карточка
+  // тізімге қайта шығып кетпеуі үшін — оператор оны «қаралды» деп
+  // санап қойған, ол қайта пайда болса шатасады.
+  dismissed: new Set(),
+  reviewedCount: 0,
   firstLoad: true,
   mapFitted: false,
   liveTimer: null,
   zones: [],
-  zoneTints: [],          // масштаб өзгергенде қалыңдығы қайта есептелетін жолақтар
+  zoneTints: [],
+  cdnLayer: null,
+  boundaryLayer: null,
+  boundaryGeo: null,          // масштаб өзгергенде қалыңдығы қайта есептелетін жолақтар
   drawing: false,
   drawingPoints: [],
   drawingLine: null,
   drawingNodes: null,
   pendingZonePoints: null,
+  currentDoc: null,
+  foundPoint: null,
+  foundMarker: null,
+  manualPoint: null,
+  pickingForManual: false,
   correctionId: null,
   correctionMarker: null,
   pendingRejectId: null,
@@ -185,6 +198,122 @@ function requireAuth() {
 
 /* ---------------- Карта ---------------- */
 
+/* Базалық карта үш деңгейлі: CDN → жергілікті кэш → тор.
+   Демо офлайн өтуі мүмкін, сондықтан тақтайша жүктелмесе де портал
+   жұмысын жалғастыруы керек: маркерлер координата бойынша дұрыс орында
+   тұрады, тек фон ғана өзгереді. */
+/* CARTO 2026 жылдан бастап кілт сұрайды (тақтайшаның орнында «API KEY
+   REQUIRED» жазуы шығады), сондықтан Esri Canvas қолданылады: кілтсіз,
+   Шымкент көшелерінің атаулары қазақша жазылған. */
+const ESRI_CANVAS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas';
+const TILE_CDN_DARK = `${ESRI_CANVAS}/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`;
+const TILE_CDN_LIGHT = `${ESRI_CANVAS}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`;
+const TILE_CDN = TILE_CDN_DARK;
+// Көше атаулары бөлек қабатта: негізгі тақтайша оларды тек ірі масштабта көрсетеді
+const TILE_LABELS_DARK = `${ESRI_CANVAS}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`;
+const TILE_LABELS_LIGHT = `${ESRI_CANVAS}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`;
+const TILE_ATTRIBUTION = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap';
+const TILE_LOCAL = '/static/tiles/{z}/{x}/{y}.png';
+
+function setBasemapMode(mode, note) {
+  const badge = $('basemap-note');
+  document.body.classList.toggle('basemap-offline', mode !== 'online');
+  if (!badge) return;
+  if (mode === 'online') {
+    badge.hidden = true;
+    return;
+  }
+  badge.hidden = false;
+  badge.querySelector('span').textContent = note;
+}
+
+/* ============================================================
+   Тема: қара / ақ
+   ------------------------------------------------------------
+   Күндіз, әсіресе проекторда, қара интерфейс оқылмайды. Таңдау
+   есте сақталады. Карта тақтасы да бірге ауысады — әйтпесе ақ
+   беттің ортасында қара карта жалғыз қалып, көзге ұрып тұрар еді.
+   ============================================================ */
+function applyTheme(mode) {
+  const light = mode === 'light';
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  localStorage.setItem('aiqyn_theme', light ? 'light' : 'dark');
+
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = light ? '#f4f4f2' : '#050506';
+
+  const button = document.getElementById('theme-toggle');
+  if (button) {
+    button.querySelector('i').className = light ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+    button.title = light ? 'Қара тема' : 'Ақ тема';
+  }
+
+  // Карта тақтасын ауыстыру
+  if (state.cdnLayer) {
+    state.cdnLayer.setUrl(light ? TILE_CDN_LIGHT : TILE_CDN_DARK);
+  }
+  if (state.labelLayer) {
+    state.labelLayer.setUrl(light ? TILE_LABELS_LIGHT : TILE_LABELS_DARK);
+  }
+}
+
+function initBasemap() {
+  const light = document.documentElement.dataset.theme === 'light';
+  const cdn = state.cdnLayer = L.tileLayer(light ? TILE_CDN_LIGHT : TILE_CDN, {
+    attribution: TILE_ATTRIBUTION,
+    maxZoom: 20,
+    maxNativeZoom: 16,
+  });
+  const labels = state.labelLayer = L.tileLayer(light ? TILE_LABELS_LIGHT : TILE_LABELS_DARK, {
+    maxZoom: 20,
+    maxNativeZoom: 16,
+    zIndex: 2,
+  });
+
+  let loaded = 0;
+  let failed = 0;
+  let switched = false;
+
+  const useLocal = () => {
+    if (switched) return;
+    switched = true;
+    state.map.removeLayer(cdn);
+    state.map.removeLayer(labels);
+
+    // Жергілікті кэш бар ма? (scripts/cache_tiles.py оны алдын ала жасайды)
+    fetch('/static/tiles/manifest.json', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((manifest) => {
+        L.tileLayer(TILE_LOCAL, {
+          attribution: `${TILE_ATTRIBUTION} · жергілікті көшірме`,
+          minZoom: manifest.min_zoom ?? 11,
+          maxZoom: manifest.max_zoom ?? 15,
+          maxNativeZoom: manifest.max_zoom ?? 15,
+          bounds: manifest.bounds,
+          errorTileUrl:
+            'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+        }).addTo(state.map);
+        setBasemapMode('cache', 'Байланыс жоқ — карта жергілікті көшірмеден');
+      })
+      .catch(() => {
+        setBasemapMode('grid', 'Байланыс жоқ — карта фоны жүктелмеді, координаталар дұрыс');
+      });
+  };
+
+  cdn.on('tileload', () => { loaded += 1; });
+  cdn.on('tileerror', () => {
+    failed += 1;
+    // Бірен-саран қате — қалыпты жағдай. Бірде-бір тақтайша келмесе ғана ауысамыз.
+    if (loaded === 0 && failed >= 4) useLocal();
+  });
+
+  cdn.addTo(state.map);
+  labels.addTo(state.map);
+
+  // CDN мүлдем жауап бермей, `tileerror` де шықпай қалатын жағдай
+  setTimeout(() => { if (loaded === 0) useLocal(); }, 6000);
+}
+
 function initMap() {
   state.map = L.map('map', {
     zoomControl: true,
@@ -192,11 +321,7 @@ function initMap() {
     minZoom: 10,
   }).setView(SHYMKENT, 13);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap, &copy; CARTO',
-    maxZoom: 20,
-    subdomains: 'abcd',
-  }).addTo(state.map);
+  initBasemap();
 
   state.layers.incidents = L.layerGroup().addTo(state.map);
   state.layers.roadworks = L.layerGroup().addTo(state.map);
@@ -211,6 +336,15 @@ function initMap() {
   state.map.on('click', async (event) => {
     if (state.drawing) {
       addDrawPoint(event.latlng);
+      return;
+    }
+    if (state.pickingForManual) {
+      state.pickingForManual = false;
+      document.querySelector('.map-wrap').classList.remove('location-mode');
+      $('location-hint').classList.remove('show');
+      setManualPoint({ lat: event.latlng.lat, lon: event.latlng.lng, label: '', detail: '' });
+      $('man-addr').value = '';
+      modal('manual-modal', true);
       return;
     }
     if (state.correctionId) await saveCorrectedLocation(event.latlng);
@@ -316,7 +450,11 @@ function renderMarkers({ fit = false } = {}) {
   });
 
   if ((fit || !state.mapFitted) && bounds.length) {
-    state.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 15 });
+    // maxZoom 15 болғанда бір көшедегі ақаулардың бәрі бір нүктеге
+    // жиналып көрінетін: оператор нешеу екенін де ажырата алмайтын.
+    // Бір көше = ~50-300 м. Esri фоны 16-шы деңгейден әрі тек созылады
+    // (бұлдырап, бос сұр алаң болып көрінеді), сондықтан шек — 16.
+    state.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 });
     state.mapFitted = true;
   }
 }
@@ -435,6 +573,335 @@ function renderZones() {
         fillColor: meta.color, fillOpacity: .025, dashArray: '4,9',
       }).bindPopup(zonePopup(zone, meta, true)).addTo(layer);
     }
+  });
+}
+
+/* ============================================================
+   iKomek 109-ға жүгіну
+   ------------------------------------------------------------
+   Шымкент әкімдігінің «i-Shymkent» орталығы 24/7 жұмыс істейді.
+   Ашық API жоқ, бірақ жария арналар бар. Жүйе өтініштің мәтінін
+   дайындап береді — оператор бір басып жібереді.
+
+   wa.me хабарламаға ФАЙЛ тіркей алмайды, сондықтан мәтінде ресми
+   PDF-ке сілтеме тұрады: 109 диспетчері оны бірден ашады.
+   ============================================================ */
+async function openIkomek(eventId) {
+  let data;
+  try {
+    data = await fetch('/api/documents/' + encodeURIComponent(eventId) + '/ikomek')
+      .then((r) => r.json());
+  } catch (error) {
+    return toast('109 сілтемесі жасалмады', 'error');
+  }
+
+  $('komek-body').innerHTML = `
+    <div class="komek-head">
+      <span class="komek-badge"><i class="fa-solid fa-headset"></i></span>
+      <div>
+        <p class="eyebrow">Ресми байланыс арнасы</p>
+        <h2>${escapeHtml(data.target)}</h2>
+        <p class="muted">Санат: Қалалық жол инфрақұрылымдары · 24/7</p>
+      </div>
+    </div>
+
+    <p class="komek-note">Хабарламаның мәтіні дайын. Батырманы бассаңыз,
+      WhatsApp ашылады да, тек «жіберу» түймесін басу қалады.
+      Ресми PDF құжат хабарламадағы сілтемеде тұр.</p>
+
+    <div class="komek-ways">
+      <a class="btn btn-komek" href="${attr(data.whatsapp)}" target="_blank" rel="noopener">
+        <i class="fa-brands fa-whatsapp"></i> WhatsApp арқылы жіберу
+        <small>${escapeHtml(data.whatsapp_number)}</small></a>
+      <a class="btn btn-ghost" href="${attr(data.telegram)}" target="_blank" rel="noopener">
+        <i class="fa-brands fa-telegram"></i> Telegram-бот</a>
+      <a class="btn btn-ghost" href="${attr(data.phone)}">
+        <i class="fa-solid fa-phone"></i> 109 нөміріне қоңырау</a>
+      <a class="btn btn-ghost" href="/api/documents/${encodeURIComponent(eventId)}/pdf"
+         target="_blank" rel="noopener">
+        <i class="fa-solid fa-file-pdf"></i> PDF-ті қарау</a>
+    </div>
+
+    <p class="section-title">Жіберілетін мәтін</p>
+    <pre class="komek-text" id="komek-text">${escapeHtml(data.text)}</pre>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="komek-copy"><i class="fa-solid fa-copy"></i> Мәтінді көшіру</button>
+      <button class="btn btn-ghost" id="komek-cancel">Жабу</button>
+    </div>`;
+
+  modal('komek-modal', true);
+  $('komek-copy').onclick = () => copyText(data.text, 'Өтініш мәтіні көшірілді');
+  $('komek-cancel').onclick = () => modal('komek-modal', false);
+}
+
+/* ============================================================
+   Мекенжай / сілтеме бойынша іздеу
+   ------------------------------------------------------------
+   Дереккөз: 2ГИС (Шымкент көшелерін жақсы біледі), резервте
+   OpenStreetMap. Картаның сілтемесін көшіріп қойса да түсінеді.
+   Табылған нүктеден бірден оқиға тіркеуге болады.
+   ============================================================ */
+let geoTimer = null;
+
+function geoResultHtml(items, hint) {
+  if (!items.length) {
+    return `<div class="geo-empty">${escapeHtml(hint || 'Ештеңе табылмады')}</div>`;
+  }
+  return items.map((item, index) => `<button class="geo-item" data-i="${index}">
+    <i class="fa-solid ${item.source === 'coords' ? 'fa-crosshairs' : 'fa-location-dot'}"></i>
+    <span><b>${escapeHtml(item.label)}</b><small>${escapeHtml(item.detail || '')}</small></span>
+  </button>`).join('');
+}
+
+async function geoLookup(query, box, onPick) {
+  if (query.trim().length < 3) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = '<div class="geo-empty">Ізделуде…</div>';
+  let data;
+  try {
+    data = await fetch('/api/geocode?q=' + encodeURIComponent(query)).then((r) => r.json());
+  } catch (error) {
+    box.innerHTML = '<div class="geo-empty">Іздеу қызметіне қосылу мүмкін болмады</div>';
+    return;
+  }
+  const items = data.results || [];
+  box.innerHTML = geoResultHtml(items, data.error || 'Шымкент шегінен ештеңе табылмады');
+  box.querySelectorAll('.geo-item').forEach((node) => {
+    node.onclick = () => { box.hidden = true; onPick(items[Number(node.dataset.i)]); };
+  });
+}
+
+/* Картадан табылған нүкте: маркер қойылады да, «осында оқиға қосу»
+   деген ұсыныс шығады */
+function showFoundPoint(item) {
+  if (state.foundMarker) state.map.removeLayer(state.foundMarker);
+  state.foundPoint = item;
+  state.foundMarker = L.marker([item.lat, item.lon], {
+    icon: L.divIcon({
+      className: 'incident-pin',
+      html: '<div class="pin-wrap" style="--pin:#1adfe3"><i class="fa-solid fa-location-crosshairs"></i></div>',
+      iconSize: [38, 44], iconAnchor: [19, 44],
+    }),
+  }).addTo(state.map);
+  state.foundMarker.bindPopup(
+    `<div class="pop"><b>${escapeHtml(item.label)}</b>`
+    + `<span>${escapeHtml(item.detail || '')}</span>`
+    + `<span class="pop-coords">${item.lat.toFixed(6)}, ${item.lon.toFixed(6)}</span>`
+    + '<button class="btn btn-sm btn-primary" id="pop-add">Осы жерге оқиға қосу</button></div>'
+  ).openPopup();
+  state.map.setView([item.lat, item.lon], 17);
+  setTimeout(() => {
+    const add = document.getElementById('pop-add');
+    if (add) add.onclick = () => { state.map.closePopup(); openManual(item); };
+  }, 60);
+}
+
+/* ============================================================
+   Суреттен автоматты қосу
+   ------------------------------------------------------------
+   Қолмен енгізуден айырмашылығы: адам ЕШТЕҢЕ таңдамайды.
+   Сурет жүктеледі — GPS суреттің өзінен, ақауды детектор табады,
+   мекенжайды 2ГИС береді, қорытындыны ЖИ жазады.
+
+   Ақау табылмаса, оқиға ЖАСАЛМАЙДЫ: «бірдеңе тапқан болып» жазба
+   қосу жүйеге деген сенімді жояды.
+   ============================================================ */
+async function uploadPhoto(file) {
+  if (!file || !requireAuth()) return;
+
+  const body = new FormData();
+  body.append('photo', file);
+  toast('Сурет өңделуде — детектор, мекенжай, ЖИ…');
+
+  const box = document.createElement('div');
+  box.className = 'photo-progress';
+  box.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>'
+    + '<span><b>' + escapeHtml(file.name) + '</b><small>детектор қарап жатыр…</small></span>';
+  document.body.appendChild(box);
+
+  try {
+    const response = await fetch('/api/documents/from-photo', {
+      method: 'POST', headers: authHeaders(), body,
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Өңделмеді');
+    }
+    if (!data.ok) {
+      // Ақау табылмауы — қате емес, НӘТИЖЕ. Оны да ашық айтамыз.
+      toast(data.detail || 'Ақау табылмады', 'warn');
+      return;
+    }
+
+    state.dismissed.clear();
+    await loadData();
+    const verdict = data.ai_verified ? 'ЖИ растады' : 'ЖИ растамады — тексеру қажет';
+    toast(`${data.defect_type} · ${data.detections} рамка · ${verdict}`, 'ok');
+    openDetail(data.event_id);
+  } catch (error) {
+    toast(error.message || 'Сурет өңделмеді', 'error');
+  } finally {
+    box.remove();
+  }
+}
+
+/* ============================================================
+   Қолмен оқиға енгізу
+   ============================================================ */
+async function openManual(point) {
+  if (!requireAuth()) return;
+  const select = $('man-type');
+  if (!select.options.length) {
+    try {
+      const data = await fetch('/api/categories').then((r) => r.json());
+      select.innerHTML = (data.categories || [])
+        .map((item) => `<option value="${attr(item.key)}" data-sev="${attr(item.severity)}">${escapeHtml(item.kk)}</option>`)
+        .join('');
+      select.onchange = () => {
+        const sev = select.selectedOptions[0]?.dataset.sev;
+        const radio = document.querySelector(`input[name="man-sev"][value="${sev}"]`);
+        if (radio) radio.checked = true;
+      };
+      select.onchange();
+    } catch (error) { toast('Ақау түрлері жүктелмеді', 'error'); }
+  }
+  setManualPoint(point || state.foundPoint || null);
+  $('man-photo').value = '';
+  $('man-photo-name').hidden = true;
+  modal('manual-modal', true);
+  setTimeout(() => $('man-addr').focus(), 80);
+}
+
+function setManualPoint(point) {
+  state.manualPoint = point || null;
+  const label = $('man-point');
+  if (!point) {
+    label.textContent = 'Нүкте әлі таңдалмаған';
+    label.classList.remove('ok');
+    return;
+  }
+  $('man-addr').value = point.label || '';
+  label.textContent = `Таңдалды: ${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}`;
+  label.classList.add('ok');
+}
+
+async function submitManual() {
+  const point = state.manualPoint;
+  if (!point) return toast('Алдымен орнын таңдаңыз', 'error');
+
+  const body = new FormData();
+  body.append('class_key', $('man-type').value);
+  body.append('lat', point.lat);
+  body.append('lon', point.lon);
+  body.append('address_text', $('man-addr').value.trim() || point.label || '');
+  body.append('severity', document.querySelector('input[name="man-sev"]:checked').value);
+  body.append('note', $('man-note').value.trim());
+  body.append('reporter', $('man-reporter').value.trim());
+  const file = $('man-photo').files[0];
+  if (file) body.append('photo', file);
+
+  const save = $('manual-save');
+  save.disabled = true;
+  save.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Тіркелуде…';
+  try {
+    const response = await fetch('/api/documents/manual', {
+      method: 'POST', headers: authHeaders(), body,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Тіркелмеді');
+    }
+    const result = await response.json();
+    modal('manual-modal', false);
+    if (state.foundMarker) { state.map.removeLayer(state.foundMarker); state.foundMarker = null; }
+    $('man-note').value = '';
+    $('man-reporter').value = '';
+    state.manualPoint = null;
+    state.dismissed.clear();
+    await loadData();
+    const verdict = result.ai_verified === true ? ' · ЖИ ақауды растады'
+      : (result.ai_verified === false ? ' · ЖИ растамады, тексеру қажет' : '');
+    toast('Оқиға тіркелді' + verdict, 'ok');
+    openDetail(result.event_id);
+  } catch (error) {
+    toast(error.message || 'Тіркелмеді', 'error');
+  } finally {
+    save.disabled = false;
+    save.innerHTML = '<i class="fa-solid fa-square-plus"></i> Тіркеу және картаға қосу';
+  }
+}
+
+/* ============================================================
+   Қала шекарасы және учаскелер тізімі
+   ------------------------------------------------------------
+   Шекара — OpenStreetMap-тегі Шымкенттің ресми әкімшілік шегі
+   (relation/3389772). Ол жүйенің жауапкершілік аймағын көрсетеді:
+   бұл сызықтың сыртындағы ақау қала әкімдігінің құзырында емес.
+   ============================================================ */
+async function toggleBoundary() {
+  if (state.boundaryLayer) {
+    state.map.removeLayer(state.boundaryLayer);
+    state.boundaryLayer = null;
+    toast('Қала шекарасы жасырылды');
+    return;
+  }
+  try {
+    const geo = state.boundaryGeo
+      || (state.boundaryGeo = await fetch('/static/shymkent.geojson').then((r) => r.json()));
+    state.boundaryLayer = L.geoJSON(geo, {
+      style: { color: '#0a84ff', weight: 2, opacity: .75, dashArray: '7 5', fill: false },
+      interactive: false,
+    }).addTo(state.map);
+    state.map.fitBounds(state.boundaryLayer.getBounds(), { padding: [30, 30] });
+    toast('Шымкенттің әкімшілік шекарасы (OSM)', 'ok');
+  } catch {
+    toast('Шекара жүктелмеді', 'error');
+  }
+}
+
+/* Учаскелер тізімі: бұрын оларды тек картадан басып қана көруге
+   болатын. Ондаған учаске болғанда керегін табу мүмкін емес. */
+function openZonesPanel() {
+  const zones = state.zones || [];
+  const KIND = { repair: ['Жол жұмысы', '#ffd60a'], closed: ['Жабық жол', '#ff453a'],
+                 ignore: ['Ішкі аймақ', '#98989f'] };
+  const body = zones.length
+    ? zones.map((zone) => {
+        const [label, color] = KIND[zone.kind] || ['Учаске', '#98989f'];
+        return `<div class="zone-row">
+          <span class="zone-dot" style="background:${color}"></span>
+          <span class="zone-copy">
+            <b>${escapeHtml(zone.name || 'Атауы жоқ')}</b>
+            <small>${escapeHtml(label)}${zone.responsible_org ? ' · ' + escapeHtml(zone.responsible_org) : ''}</small>
+          </span>
+          <button class="btn btn-sm btn-ghost" data-zoom="${attr(zone.id)}" title="Картадан көрсету">
+            <i class="fa-solid fa-location-crosshairs"></i></button>
+          <button class="btn btn-sm btn-danger" data-drop="${attr(zone.id)}" title="Учаскені өшіру">
+            <i class="fa-solid fa-xmark"></i></button>
+        </div>`;
+      }).join('')
+    : '<p class="muted">Әзірге белгіленген учаске жоқ.</p>';
+
+  $('zones-list').innerHTML = body;
+  $('zones-count').textContent = `${zones.length} учаске`;
+  modal('zones-modal', true);
+
+  $('zones-list').querySelectorAll('[data-zoom]').forEach((btn) => {
+    btn.onclick = () => {
+      const zone = zones.find((z) => String(z.id) === btn.dataset.zoom);
+      const points = zoneGeometry(zone);
+      modal('zones-modal', false);
+      if (points && points.length) state.map.fitBounds(L.latLngBounds(points), { padding: [60, 60] });
+      else if (zone.lat && zone.lon) state.map.setView([zone.lat, zone.lon], 16);
+    };
+  });
+  $('zones-list').querySelectorAll('[data-drop]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!window.confirm('Учаске өшірілсін бе?')) return;
+      await deactivateZone(btn.dataset.drop);
+      modal('zones-modal', false);
+    };
   });
 }
 
@@ -624,11 +1091,25 @@ window.deactivateZone = deactivateZone;
 function renderList() {
   const list = $('list');
   const query = $('filter-search').value.trim().toLocaleLowerCase('kk-KZ');
-  state.visibleDocuments = query ? state.documents.filter((doc) => [
+  const pool = state.documents.filter((doc) => !state.dismissed.has(doc.event_id));
+  state.visibleDocuments = query ? pool.filter((doc) => [
     doc.event_id, doc.defect_type_official, doc.display_address_text, doc.address_text,
-  ].some((value) => String(value || '').toLocaleLowerCase('kk-KZ').includes(query))) : [...state.documents];
+  ].some((value) => String(value || '').toLocaleLowerCase('kk-KZ').includes(query))) : [...pool];
+
+  // Қауіпті ақау кезек күтпеуі керек: тексерілмеген «жоғары» деңгейлілер
+  // тізімнің басына шығады. Қалғанының реті (жаңасы жоғарыда) сақталады.
+  const urgent = (doc) => (doc.status === 'new' && doc.severity === 'high' ? 0 : 1);
+  state.visibleDocuments.sort((a, b) => urgent(a) - urgent(b));
 
   $('list-count').textContent = `${state.visibleDocuments.length} оқиға`;
+
+  // Осы отырыста қаншасы қаралғаны — жұмыстың көрінетін нәтижесі
+  const done = $('queue-done');
+  if (done) {
+    const count = state.reviewedCount || 0;
+    done.hidden = !count;
+    done.textContent = `${count} қаралды`;
+  }
 
   if (!state.visibleDocuments.length) {
     list.innerHTML = `<div class="empty"><i class="fa-solid fa-inbox" aria-hidden="true"></i>Бұл сүзгі бойынша оқиға табылмады.</div>`;
@@ -640,27 +1121,54 @@ function renderList() {
     const severity = doc.severity || 'low';
     const approximate = !doc.gps_trusted && !doc.location_corrected;
     const fresh = state.freshIds.has(doc.event_id);
-    return `<button class="card ${doc.event_id === state.selectedId ? 'active' : ''}" data-id="${attr(doc.event_id)}" style="--card-accent:${SEVERITY_COLOR[severity] || SEVERITY_COLOR.low}">
-      <div class="card-head">
-        <span class="card-icon ${attr(severity)}"><i class="fa-solid ${TYPE_ICON[doc.class_key] || SEVERITY_ICON[severity] || 'fa-location-dot'}" aria-hidden="true"></i></span>
+    // Кіші карточкада ДӘЛЕЛ бірден көрінеді: оператор ашпай тұрып-ақ
+    // «бұл шынымен ақау ма» дегенді көзбен шеше алады
+    const thumb = doc.photo_file
+      ? `<img class="card-thumb" src="/media/${encodeURIComponent(doc.event_id)}/${attr(doc.photo_file)}"
+              alt="" loading="lazy" decoding="async">`
+      : `<span class="card-thumb card-thumb--empty"><i class="fa-solid ${TYPE_ICON[doc.class_key] || SEVERITY_ICON[severity] || 'fa-location-dot'}"></i></span>`;
+    const pending = !isReviewedStatus(doc.status);
+
+    return `<article class="card ${doc.event_id === state.selectedId ? 'active' : ''}" data-id="${attr(doc.event_id)}" style="--card-accent:${SEVERITY_COLOR[severity] || SEVERITY_COLOR.low}">
+      <div class="card-main" data-open="${attr(doc.event_id)}" role="button" tabindex="0">
+        ${thumb}
         <span class="card-copy">
           <span class="card-type">${escapeHtml(doc.defect_type_official || 'Инфрақұрылым ақауы')}</span>
           <span class="card-addr"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${escapeHtml(doc.display_address_text || doc.address_text || 'Мекенжай нақтыланбаған')}</span>
+          <span class="card-meta">
+            <span class="badge ${attr(severity)}">${escapeHtml(doc.severity_kk || severity)}</span>
+            <span class="badge">ЖИ ${Math.round((doc.confidence || 0) * 100)}%</span>
+            ${approximate ? '<span class="badge medium"><i class="fa-solid fa-location-crosshairs"></i> Орны жуық</span>' : ''}
+            ${doc.source_type === 'manual'
+              ? '<span class="badge src-manual"><i class="fa-solid fa-pen"></i> Қолмен</span>'
+              : '<span class="badge src-auto"><i class="fa-solid fa-robot"></i> Автоматты</span>'}
+            ${doc.external_ticket_id ? `<span class="badge st-sent">№ ${escapeHtml(doc.external_ticket_id)}</span>` : ''}
+            ${!pending ? `<span class="badge st-${attr(doc.status)}">${escapeHtml(STATUS_LABEL[doc.status] || doc.status)}</span>` : ''}
+          </span>
         </span>
         <time class="card-time" title="${attr(doc.timestamp_human || shortDate(doc.timestamp))}">${escapeHtml(relativeTime(doc.timestamp) || (doc.timestamp_human || '').slice(11, 16))}${fresh ? '<span class="fresh-dot" title="Жаңа оқиға"></span>' : ''}</time>
       </div>
-      <span class="card-meta">
-        <span class="badge ${attr(severity)}">${escapeHtml(doc.severity_kk || severity)}</span>
-        <span class="badge st-${attr(doc.status)}">${escapeHtml(STATUS_LABEL[doc.status] || doc.status)}</span>
-        <span class="badge">AI ${Math.round((doc.confidence || 0) * 100)}%</span>
-        ${approximate ? '<span class="badge medium"><i class="fa-solid fa-location-crosshairs"></i> Орны жуық</span>' : ''}
-        ${doc.external_ticket_id ? `<span class="badge st-sent">№ ${escapeHtml(doc.external_ticket_id)}</span>` : ''}
-      </span>
-    </button>`;
+      ${pending ? `<div class="card-quick">
+        <button class="card-act reject" data-quick-reject="${attr(doc.event_id)}" title="Жалған анықтау — қарамай-ақ қабылдамау">
+          <i class="fa-solid fa-xmark"></i> Жалған</button>
+        <button class="card-act open" data-open="${attr(doc.event_id)}" title="Толық ашып тексеру">
+          Ашып тексеру <i class="fa-solid fa-arrow-right"></i></button>
+      </div>` : ''}
+    </article>`;
   }).join('');
 
-  list.querySelectorAll('.card').forEach((card) => {
-    card.onclick = () => openDetail(card.dataset.id);
+  list.querySelectorAll('[data-open]').forEach((node) => {
+    node.onclick = () => openDetail(node.dataset.open);
+    node.onkeydown = (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(node.dataset.open); }
+    };
+  });
+  // Кіші карточкадан бірден қабылдамау: анық қоқыс сигналды ашудың қажеті жоқ
+  list.querySelectorAll('[data-quick-reject]').forEach((node) => {
+    node.onclick = (event) => {
+      event.stopPropagation();
+      openReject(node.dataset.quickReject);
+    };
   });
   const activeCard = list.querySelector('.card.active');
   if (activeCard) activeCard.scrollIntoView({ block: 'nearest' });
@@ -697,11 +1205,17 @@ function renderTypeStats(stats) {
   const max = Math.max(...rows.map((row) => Number(row.count)));
   const total = rows.reduce((sum, row) => sum + Number(row.count), 0);
 
+  /* Жиналмалы: панельдің биіктігі шектеулі, ал оператордың негізгі
+     жұмысы — тізім. Есеп керек кезде ашылады, әдепкіде жабық тұрады
+     да, кезекке орын босатады. Күйі есте сақталады. */
+  const open = localStorage.getItem('aiqyn_types_open') === '1';
   box.innerHTML = `
-    <div class="type-stats-head">
-      <span>Ақау түрлері</span>
-      <b>${total}</b>
-    </div>
+    <details class="type-stats-box"${open ? ' open' : ''}>
+      <summary class="type-stats-head">
+        <span>Ақау түрлері</span>
+        <b>${total}</b>
+        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+      </summary>
     ${rows.map((row) => {
       const key = row.class_key || '';
       const count = Number(row.count);
@@ -716,7 +1230,13 @@ function renderTypeStats(stats) {
           <b class="type-count">${count}</b>
         </button>`;
     }).join('')}
+    </details>
   `;
+
+  const box_details = box.querySelector('details');
+  if (box_details) {
+    box_details.ontoggle = () => localStorage.setItem('aiqyn_types_open', box_details.open ? '1' : '0');
+  }
 
   box.querySelectorAll('[data-type]').forEach((row) => {
     row.onclick = () => {
@@ -727,31 +1247,14 @@ function renderTypeStats(stats) {
   });
 }
 
+/* Хидердегі сандар аналитика бетіне көшті: оператордың экраны кезекке
+   арналған, ал сан — басшының есебіне. Мұнда тек панельдегі түр есебі
+   қалды, ол сүзгі ретінде де жұмыс істейді. */
 function renderStats(stats) {
-  const cards = [
-    { icon: 'fa-layer-group', label: 'Барлығы', value: Number(stats.total || 0), status: 'all', cls: '' },
-    { icon: 'fa-bell', label: 'Тексеруде', value: Number(stats.pending_review || 0), status: 'new', cls: 'alert' },
-    { icon: 'fa-paper-plane', label: '109-ға жіберілді', value: Number(stats.by_status?.sent || stats.by_status?.submitted || 0), status: 'sent', cls: '' },
-    { icon: 'fa-person-digging', label: 'Жұмыста', value: Number(stats.by_status?.in_progress || 0), status: 'in_progress', cls: 'work' },
-    { icon: 'fa-road-barrier', label: 'Карта учаскесі', value: Number(stats.active_zones || 0), status: null, cls: '' },
-  ];
-  const previous = state.lastStats || {};
-  $('stats').innerHTML = cards.map((card, index) => {
-    const bump = previous[card.label] != null && previous[card.label] !== card.value;
-    return `<button class="stat-card ${card.cls} ${bump ? 'bump' : ''}" data-stat-index="${index}" ${card.status ? `data-status="${card.status}" title="Сүзгі: ${card.label}"` : ''}>
-      <i class="fa-solid ${card.icon}"></i><span>${card.label}</span><b>${card.value}</b>
-    </button>`;
-  }).join('');
   renderTypeStats(stats);
-  state.lastStats = Object.fromEntries(cards.map((card) => [card.label, card.value]));
-  $('stats').querySelectorAll('[data-status]').forEach((chip) => {
-    chip.onclick = () => {
-      $('filter-status').value = chip.dataset.status;
-      closeDetail();
-      loadData();
-    };
-  });
+  state.lastStats = stats;
 }
+
 
 async function loadData() {
   const status = $('filter-status').value;
@@ -795,134 +1298,379 @@ async function loadData() {
 
 /* ---------------- Оқиға карточкасы ---------------- */
 
+/* Дәлелді толық өлшемде ашу.
+   Оң жақ панельдегі кадр кішкентай — ақауды көзбен тексеру үшін
+   операторға толық өлшем қажет. */
+function bindLightbox(id) {
+  const box = $(id || 'media-box');
+  if (!box) return;
+  const media = box.querySelector('img, video');
+  if (!media) return;
+  media.style.cursor = 'zoom-in';
+  media.onclick = () => openLightbox(media);
+}
+
+function openLightbox(media) {
+  const isVideo = media.tagName === 'VIDEO';
+  const box = document.createElement('div');
+  box.className = 'lightbox';
+  box.innerHTML = `
+    <button class="lightbox-close" aria-label="Жабу"><i class="fa-solid fa-xmark"></i></button>
+    ${isVideo
+      ? `<video src="${attr(media.getAttribute('src'))}" controls autoplay loop playsinline></video>`
+      : `<img src="${attr(media.getAttribute('src'))}" alt="${attr(media.alt || 'Дәлел')}">`}
+    <a class="lightbox-open" href="${attr(media.getAttribute('src'))}" target="_blank" rel="noopener">
+      <i class="fa-solid fa-arrow-up-right-from-square"></i> Бөлек терезеде ашу</a>`;
+  const close = () => {
+    box.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  box.addEventListener('click', (e) => {
+    if (e.target === box || e.target.closest('.lightbox-close')) close();
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(box);
+  box.querySelector('.lightbox-close').focus();
+}
+
+/* ЖИ-сарапшының қорытындысы — бөлек, толық блок.
+   Бұрын оның бөліктері жалпы кестенің ішінде шашылып жататын да,
+   оператор ЖИ не деп жазғанын түсінбейтін. */
+function renderAiBlock(doc) {
+  const has = doc.ai_verified || doc.ai_note || doc.ai_size ||
+              doc.ai_location || doc.ai_action || doc.ai_danger;
+  if (!has) {
+    return `
+    <div class="detail-section"><p class="section-title">ЖИ талдауы</p></div>
+    <div class="ai-block ai-block--off">
+      <p>Бұл оқиға ЖИ-сарапшыдан өтпеген — детекция тікелей операторға берілген.
+      Қорытынды тек <code>ai_verify</code> қосулы болғанда жазылады.</p>
+    </div>`;
+  }
+
+  const rows = [
+    ['Тексеру нәтижесі', doc.ai_verified ? 'Ақау расталды' : 'Күмәнді — оператор шешеді'],
+    ['ЖИ сенімділігі', doc.ai_confidence ? Math.round(doc.ai_confidence * 100) + '%' : null],
+    ['Шамаланған өлшемі', doc.ai_size],
+    ['Жолдағы орны', doc.ai_location],
+    ['Қауіптілігі', doc.ai_danger],
+    ['Ұсынылатын шара', doc.ai_action ?
+      doc.ai_action + (doc.ai_urgency_days ? ` · ${Number(doc.ai_urgency_days)} күн ішінде` : '') : null],
+  ].filter((r) => r[1]);
+
+  return `
+    <div class="detail-section"><p class="section-title">ЖИ талдауы</p></div>
+    <div class="ai-block${doc.ai_verified ? ' ai-block--ok' : ' ai-block--warn'}">
+      <div class="ai-head">
+        <span class="ai-icon"><i class="fa-solid fa-microchip"></i></span>
+        <div>
+          <b>${doc.ai_verified ? 'ЖИ ақауды растады' : 'ЖИ күмән білдірді'}</b>
+          <small>${escapeHtml(doc.ai_model || 'көру моделі')} · қорытынды операторға арналған кеңес,
+            шешім емес</small>
+        </div>
+      </div>
+      ${doc.ai_note ? `<p class="ai-note">${escapeHtml(doc.ai_note)}</p>` : ''}
+      <dl class="ai-rows">
+        ${rows.map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join('')}
+      </dl>
+    </div>`;
+}
+
+/* ============================================================
+   Оқиға карточкасы: ЕКІ ДЕҢГЕЙ
+   ------------------------------------------------------------
+   1) Кіші панель — жылдам шешім үшін. Дәлел, төрт негізгі дерек
+      және екі батырма. Оператордың жұмысының көбі осында бітеді.
+   2) «Толығырақ» — үлкен терезе. Тексеру керек болғанда ғана
+      ашылады: ірі дәлел, барлық дерек, ЖИ қорытындысы, жеткізу
+      квитанциясы, тарих және қалған әрекеттердің бәрі.
+
+   Бұрын бәрі бір панельде тұрған: биіктігі экраннан асып,
+   оператор растау батырмасына жету үшін ұзақ айналдыратын.
+   ============================================================ */
+
+function docContext(doc) {
+  const { lat, lon } = currentCoordinates(doc);
+  return {
+    doc,
+    lat,
+    lon,
+    mediaBase: '/media/' + encodeURIComponent(doc.event_id),
+    draft: isDraft(doc),
+    approximate: !doc.gps_trusted && !doc.location_corrected,
+    reviewed: isReviewedStatus(doc.status),
+    mapLink: doc.map_link || ('https://www.google.com/maps?q=' + lat + ',' + lon),
+    gisLink: Number.isFinite(lat) && Number.isFinite(lon)
+      ? 'https://2gis.kz/shymkent?m=' + lon + '%2C' + lat + '%2F16' : null,
+  };
+}
+
+function statusBanner(c) {
+  if (c.draft) {
+    return '<div class="draft-banner"><i class="fa-solid fa-file-pen"></i> <b>ӨТІНІМ ЖОБАСЫ</b> · Ресми арнаға жіберілмеген.</div>';
+  }
+  const label = c.doc.external_ticket_id
+    ? 'ЕКЦ 109 № ' + escapeHtml(c.doc.external_ticket_id)
+    : 'Оператор тексерген өтінім';
+  const when = c.doc.external_ticket_created_at
+    ? ' · ' + escapeHtml(shortDate(c.doc.external_ticket_created_at)) : '';
+  return '<div class="registered-banner"><i class="fa-solid fa-circle-check"></i> <b>' + label + '</b>' + when + '</div>';
+}
+
+/* Тексерілмеген оқиғадағы негізгі екі батырма — екі деңгейде де бірдей */
+function decideActions(c, suffix) {
+  // Тексерілмеген оқиғада: растау + қабылдамау. Жіберу батырмасы БІРЕУ —
+  // растау мен 109-ға жүгіну бір әрекет, екі бөлек батырма шатастырады.
+  if (!c.reviewed) {
+    return '<button class="btn btn-primary span-2" data-act="confirm' + suffix + '">'
+      + '<i class="fa-solid fa-paper-plane"></i> Тексеру және 109-ға жіберу</button>'
+      + '<button class="btn btn-danger span-2" data-act="reject' + suffix + '">'
+      + '<i class="fa-solid fa-xmark"></i> Жалған деп белгілеу</button>';
+  }
+  // Расталып қойған оқиға: 109-ға қайта жүгінуге болады
+  return '<button class="btn btn-komek span-2" data-act="ikomek' + suffix + '">'
+    + '<i class="fa-brands fa-whatsapp"></i> iKomek 109-ға жүгіну</button>';
+}
+
 async function openDetail(eventId) {
   state.selectedId = eventId;
   renderList();
 
-  const response = await fetch(`/api/documents/${encodeURIComponent(eventId)}`);
+  const response = await fetch('/api/documents/' + encodeURIComponent(eventId));
   if (!response.ok) return toast('Оқиға карточкасы жүктелмеді', 'error');
   const doc = await response.json();
+  state.currentDoc = doc;
+
+  const c = docContext(doc);
   const detail = $('detail');
-  const mediaBase = `/media/${encodeURIComponent(doc.event_id)}`;
-  const draft = isDraft(doc);
-  const approximate = !doc.gps_trusted && !doc.location_corrected;
-  const reviewed = isReviewedStatus(doc.status);
-  const { lat, lon } = currentCoordinates(doc);
-  const mapLink = doc.map_link || `https://www.google.com/maps?q=${lat},${lon}`;
-  const gisLink = Number.isFinite(lat) && Number.isFinite(lon) ? `https://2gis.kz/shymkent?m=${lon}%2C${lat}%2F16` : null;
-  const officialTitle = draft ? 'Өтінім жобасының мәтіні' : 'Жөндеу өтінімінің мәтіні';
 
   detail.innerHTML = `
     <div class="detail-head">
       <div>
-        <p class="eyebrow">Оқиға карточкасы</p>
+        <p class="eyebrow">Оқиға</p>
         <h2 class="detail-title">${escapeHtml(doc.defect_type_official || 'Инфрақұрылым ақауы')}</h2>
         <div class="detail-id">${escapeHtml(doc.event_id)}</div>
       </div>
       <div class="detail-head-actions">
-        <button class="close-x" id="btn-copy-link" title="Оқиғаға сілтемені көшіру" aria-label="Оқиғаға сілтемені көшіру"><i class="fa-solid fa-link"></i></button>
-        <button class="close-x" id="detail-close" aria-label="Карточканы жабу"><i class="fa-solid fa-xmark"></i></button>
+        <button class="close-x" id="btn-copy-link" title="Сілтемені көшіру" aria-label="Сілтемені көшіру"><i class="fa-solid fa-link"></i></button>
+        <button class="close-x" id="detail-close" aria-label="Жабу"><i class="fa-solid fa-xmark"></i></button>
       </div>
     </div>
 
-    ${draft ? `<div class="draft-banner"><i class="fa-solid fa-file-pen"></i> <b>ӨТІНІМ ЖОБАСЫ</b> · Ресми арнаға жіберілмеген. Оператор тексергеннен кейін ғана ЕКЦ 109-ға жолданады.</div>`
-      : `<div class="registered-banner"><i class="fa-solid fa-circle-check"></i> <b>${doc.external_ticket_id ? `ЕКЦ 109 № ${escapeHtml(doc.external_ticket_id)}` : 'Оператор тексерген өтінім'}</b>${doc.external_ticket_created_at ? ` · ${escapeHtml(shortDate(doc.external_ticket_created_at))}` : ''}</div>`}
+    ${statusBanner(c)}
+    ${c.approximate ? '<div class="warn"><i class="fa-solid fa-location-crosshairs"></i> GPS орны жуық. Жібермес бұрын маркерді нақтылаған жөн.</div>' : ''}
 
-    ${approximate ? '<div class="warn"><i class="fa-solid fa-location-crosshairs"></i> GPS орны жуық көрсетілген. Өтінімді жібермес бұрын маркерді жолдың нақты нүктесіне бекітіңіз.</div>' : ''}
-
-    ${doc.video_file ? `<div class="media-tabs">
-      <button class="media-tab active" data-tab="photo">Фотофиксация</button>
-      <button class="media-tab" data-tab="video">Видео · ${Math.round(doc.video_seconds || 0)} сек</button>
-      ${doc.after_photo_file ? '<button class="media-tab" data-tab="after">Орындалғаннан кейін</button>' : ''}
-    </div>` : ''}
-    <div class="media" id="media-box">
-      ${doc.photo_file ? `<img src="${mediaBase}/${attr(doc.photo_file)}" alt="Ақаудың фотофиксациясы">` : '<div class="empty"><i class="fa-solid fa-image"></i>Фото дәлел жоқ</div>'}
+    <div class="media media--sm" id="media-box">
+      ${doc.photo_file
+        ? `<img src="${c.mediaBase}/${attr(doc.photo_file)}" alt="Ақаудың фотофиксациясы">`
+        : '<div class="empty"><i class="fa-solid fa-image"></i>Фото дәлел жоқ</div>'}
     </div>
 
-    <div class="detail-section"><p class="section-title">Оқиға деректері</p></div>
-    <div class="fields">
-      <div class="field"><span class="field-key">Жұмыс күйі</span><span class="field-val"><span class="badge st-${attr(doc.status)}">${escapeHtml(STATUS_LABEL[doc.status] || doc.status)}</span></span></div>
-      <div class="field"><span class="field-key">Мекенжай</span><span class="field-val">${escapeHtml(doc.display_address_text || doc.address_text || '—')}</span></div>
-      <div class="field"><span class="field-key">Координата</span><span class="field-val">${Number.isFinite(lat) ? lat.toFixed(6) : '—'}, ${Number.isFinite(lon) ? lon.toFixed(6) : '—'} · <a href="${attr(mapLink)}" target="_blank" rel="noopener">Google</a>${gisLink ? ` · <a href="${attr(gisLink)}" target="_blank" rel="noopener">2GIS</a>` : ''} · <button class="text-btn" id="btn-copy-coords" type="button">көшіру</button></span></div>
-      <div class="field"><span class="field-key">Геопозиция</span><span class="field-val">${doc.location_corrected ? '<span class="badge st-confirmed">Оператор нақтылады</span>' : escapeHtml(accuracyLabel(doc))} · ${escapeHtml(doc.gps_source || doc.geo_source || 'дереккөз белгісіз')}</span></div>
-      <div class="field"><span class="field-key">Алдын ала қауіп</span><span class="field-val"><span class="badge ${attr(doc.severity || 'low')}">${escapeHtml(doc.severity_kk || doc.severity || 'Бағаланбаған')}</span></span></div>
-      <div class="field"><span class="field-key">Модель сенімділігі</span><span class="field-val">${Math.round((doc.confidence || 0) * 100)}% · бұл ауырлық бағасы емес</span></div>
-      ${doc.ai_verified ? `<div class="field"><span class="field-key">AI қосымша бағасы</span><span class="field-val"><span class="badge ai">${Math.round((doc.ai_confidence || 0) * 100)}%</span>${doc.ai_note ? `<br>${escapeHtml(doc.ai_note)}` : ''}</span></div>` : ''}
-      ${doc.ai_size ? `<div class="field"><span class="field-key">Шамаланған өлшем</span><span class="field-val">${escapeHtml(doc.ai_size)}</span></div>` : ''}
-      ${doc.ai_location ? `<div class="field"><span class="field-key">Жолдағы орны</span><span class="field-val">${escapeHtml(doc.ai_location)}</span></div>` : ''}
-      ${doc.ai_action ? `<div class="field"><span class="field-key">Ұсынылатын шара</span><span class="field-val">${escapeHtml(doc.ai_action)}${doc.ai_urgency_days ? ` · ${Number(doc.ai_urgency_days)} күн` : ''}</span></div>` : ''}
-      <div class="field"><span class="field-key">Анықталған уақыт</span><span class="field-val">${escapeHtml(doc.timestamp_human || shortDate(doc.timestamp))}</span></div>
-      <div class="field"><span class="field-key">Жауапты бағыт</span><span class="field-val">${escapeHtml(doc.responsible_org || 'ЕКЦ 109 диспетчерлік кезегі')}</span></div>
-      ${doc.external_ticket_id ? `<div class="field"><span class="field-key">109 өтінімі</span><span class="field-val"><b>${escapeHtml(doc.external_ticket_id)}</b>${doc.external_ticket_status ? ` · ${escapeHtml(doc.external_ticket_status)}` : ''}</span></div>` : ''}
+    <div class="quick-facts">
+      <div><span>Мекенжай</span><b>${escapeHtml(doc.display_address_text || doc.address_text || '—')}</b></div>
+      <div><span>Қауіп</span><b><span class="badge ${attr(doc.severity || 'low')}">${escapeHtml(doc.severity_kk || doc.severity || '—')}</span></b></div>
+      <div><span>Сенімділік</span><b>${Math.round((doc.confidence || 0) * 100)}%</b></div>
+      <div><span>Уақыты</span><b>${escapeHtml(doc.timestamp_human || shortDate(doc.timestamp))}</b></div>
     </div>
 
-    <div class="detail-section"><p class="section-title">${officialTitle}</p></div>
-    <div class="doc-text">${escapeHtml(doc.description_text || 'Мәтін қалыптастырылмаған.')}</div>
+    <button class="btn btn-ghost more-btn" id="btn-more">
+      <span><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Толығырақ ашу</span>
+      <small>дәлел, ЖИ талдауы, тарих, барлық әрекет</small>
+    </button>
 
-    <div class="detail-section"><p class="section-title">Әрекеттер тарихы</p></div>
-    <div class="history">
-      ${(doc.history || []).map((item) => `<div class="history-item">
-        <span class="history-dot"></span>
-        <span><b>${escapeHtml(STATUS_LABEL[item.status] || item.status)}</b>${item.note ? ` · ${escapeHtml(item.note)}` : ''}<br><small>${escapeHtml(shortDate(item.created_at))} · ${escapeHtml(item.actor || 'system')}</small></span>
-      </div>`).join('') || '<div class="empty">Тарих жазбасы жоқ</div>'}
-    </div>
-
-    <div class="actions">
-      ${!reviewed ? `<button class="btn btn-primary span-2" id="btn-confirm"><i class="fa-solid fa-paper-plane"></i> Тексеру және ЕКЦ 109-ға жіберу</button>
-        <button class="btn btn-danger" id="btn-reject"><i class="fa-solid fa-xmark"></i> Жалған анықтау</button>` : ''}
-      <button class="btn btn-ghost" id="btn-correct-location"><i class="fa-solid fa-location-crosshairs"></i> Орнын нақтылау</button>
-      <button class="btn btn-ghost" id="btn-docx"><i class="fa-solid fa-file-word"></i> Word</button>
-      <button class="btn btn-ghost" id="btn-print"><i class="fa-solid fa-print"></i> PDF</button>
-      ${['sent', 'submitted', 'registered', 'assigned'].includes(doc.status) ? '<button class="btn btn-warning span-2" id="btn-progress"><i class="fa-solid fa-person-digging"></i> Жұмыс басталды деп белгілеу</button>' : ''}
-      ${doc.status === 'in_progress' ? '<button class="btn btn-primary span-2" id="btn-after"><i class="fa-solid fa-camera"></i> Орындалғаннан кейінгі фотоны қосу</button><input type="file" id="after-file" accept="image/jpeg,image/png" hidden>' : ''}
-      ${doc.status === 'repaired' ? '<button class="btn btn-primary" id="btn-close-work"><i class="fa-solid fa-circle-check"></i> Қайта тексерілді — жабу</button><button class="btn btn-danger" id="btn-reopen"><i class="fa-solid fa-rotate-left"></i> Ақау қалды — қайта ашу</button>' : ''}
-      ${doc.status === 'reopened' ? '<button class="btn btn-warning span-2" id="btn-resume"><i class="fa-solid fa-person-digging"></i> Қайта жөндеуге беру</button>' : ''}
-    </div>`;
+    <div class="actions">${decideActions(c, '')}</div>`;
 
   detail.classList.add('open');
   detail.setAttribute('aria-hidden', 'false');
   syncUrlEvent(eventId);
   $('detail-close').onclick = closeDetail;
-  $('btn-copy-link').onclick = () => {
-    const url = `${location.origin}/portal?event=${encodeURIComponent(doc.event_id)}`;
-    copyText(url, 'Оқиға сілтемесі көшірілді');
-  };
-  if ($('btn-copy-coords')) $('btn-copy-coords').onclick = () => copyText(`${lat.toFixed(6)}, ${lon.toFixed(6)}`, 'Координата көшірілді');
-  $('btn-docx').onclick = () => { location.href = `/api/documents/${encodeURIComponent(doc.event_id)}/docx`; };
-  $('btn-print').onclick = () => { window.open(`/documents/${encodeURIComponent(doc.event_id)}/print`, '_blank', 'noopener'); };
-  $('btn-correct-location').onclick = () => startLocationCorrection(doc.event_id);
-  if ($('btn-confirm')) $('btn-confirm').onclick = () => confirmAndSend(doc.event_id);
-  if ($('btn-reject')) $('btn-reject').onclick = () => openReject(doc.event_id);
-  if ($('btn-progress')) $('btn-progress').onclick = () => setStatus(doc.event_id, 'in_progress', 'Жауапты орындаушы жұмысты бастады');
-  if ($('btn-close-work')) $('btn-close-work').onclick = () => setStatus(doc.event_id, 'closed', 'Қайта тексеру нәтижесінде ақаудың жойылғаны расталды');
-  if ($('btn-reopen')) $('btn-reopen').onclick = () => setStatus(doc.event_id, 'reopened', 'Қайта тексеру кезінде ақау толық жойылмағаны анықталды');
-  if ($('btn-resume')) $('btn-resume').onclick = () => setStatus(doc.event_id, 'in_progress', 'Қайта жөндеу жұмысы басталды');
-  if ($('btn-after')) {
-    $('btn-after').onclick = () => $('after-file').click();
-    $('after-file').onchange = (event) => uploadAfterPhoto(doc.event_id, event.target.files?.[0]);
-  }
+  $('btn-copy-link').onclick = () => copyText(
+    location.origin + '/portal?event=' + encodeURIComponent(doc.event_id),
+    'Оқиға сілтемесі көшірілді');
+  $('btn-more').onclick = openFull;
+  const thumb = detail.querySelector('#media-box img');
+  if (thumb) { thumb.style.cursor = 'zoom-in'; thumb.onclick = openFull; }
+  bindDocActions(detail, c, '');
+}
 
-  detail.querySelectorAll('.media-tab').forEach((tab) => {
+/* ---------- Үлкен терезе ---------- */
+function openFull() {
+  const doc = state.currentDoc;
+  if (!doc) return;
+  const c = docContext(doc);
+  const officialTitle = c.draft ? 'Өтінім жобасының мәтіні' : 'Жөндеу өтінімінің мәтіні';
+
+  $('full-body').innerHTML = `
+    <div class="full-head">
+      <div>
+        <p class="eyebrow">Оқиға карточкасы</p>
+        <h2>${escapeHtml(doc.defect_type_official || 'Инфрақұрылым ақауы')}</h2>
+        <div class="detail-id">${escapeHtml(doc.event_id)}</div>
+      </div>
+      ${statusBanner(c)}
+    </div>
+
+    <div class="full-grid">
+      <div class="full-left">
+        ${doc.video_file ? `<div class="media-tabs">
+          <button class="media-tab active" data-tab="photo">Фотофиксация</button>
+          <button class="media-tab" data-tab="video">Видео · ${Math.round(doc.video_seconds || 0)} сек</button>
+          ${doc.after_photo_file ? '<button class="media-tab" data-tab="after">Орындалғаннан кейін</button>' : ''}
+        </div>` : ''}
+        <div class="media" id="full-media">
+          ${doc.photo_file
+            ? `<img src="${c.mediaBase}/${attr(doc.photo_file)}" alt="Ақаудың фотофиксациясы">`
+            : '<div class="empty"><i class="fa-solid fa-image"></i>Фото дәлел жоқ</div>'}
+        </div>
+        ${renderAiBlock(doc)}
+        <div class="detail-section"><p class="section-title">${officialTitle}</p></div>
+        <div class="doc-text">${escapeHtml(doc.description_text || 'Мәтін қалыптастырылмаған.')}</div>
+      </div>
+
+      <div class="full-right">
+        ${c.approximate ? '<div class="warn"><i class="fa-solid fa-location-crosshairs"></i> GPS орны жуық көрсетілген. Өтінімді жібермес бұрын маркерді жолдың нақты нүктесіне бекітіңіз.</div>' : ''}
+        <div class="detail-section"><p class="section-title">Оқиға деректері</p></div>
+        <div class="fields">
+          <div class="field"><span class="field-key">Жұмыс күйі</span><span class="field-val"><span class="badge st-${attr(doc.status)}">${escapeHtml(STATUS_LABEL[doc.status] || doc.status)}</span></span></div>
+          <div class="field"><span class="field-key">Мекенжай</span><span class="field-val">${escapeHtml(doc.display_address_text || doc.address_text || '—')}</span></div>
+          <div class="field"><span class="field-key">Координата</span><span class="field-val">${Number.isFinite(c.lat) ? c.lat.toFixed(6) : '—'}, ${Number.isFinite(c.lon) ? c.lon.toFixed(6) : '—'} · <a href="${attr(c.mapLink)}" target="_blank" rel="noopener">Google</a>${c.gisLink ? ` · <a href="${attr(c.gisLink)}" target="_blank" rel="noopener">2GIS</a>` : ''} · <button class="text-btn" data-act="coords" type="button">көшіру</button></span></div>
+          <div class="field"><span class="field-key">Геопозиция</span><span class="field-val">${doc.location_corrected ? '<span class="badge st-confirmed">Оператор нақтылады</span>' : escapeHtml(accuracyLabel(doc))} · ${escapeHtml(doc.gps_source || doc.geo_source || 'дереккөз белгісіз')}</span></div>
+          <div class="field"><span class="field-key">Алдын ала қауіп</span><span class="field-val"><span class="badge ${attr(doc.severity || 'low')}">${escapeHtml(doc.severity_kk || doc.severity || 'Бағаланбаған')}</span></span></div>
+          <div class="field"><span class="field-key">Модель сенімділігі</span><span class="field-val">${Math.round((doc.confidence || 0) * 100)}% · бұл ауырлық бағасы емес</span></div>
+          <div class="field"><span class="field-key">Қалай тіркелді</span><span class="field-val">${doc.source_type === 'manual'
+            ? '<span class="badge src-manual"><i class="fa-solid fa-pen"></i> Оператор қолмен енгізді</span>'
+            : '<span class="badge src-auto"><i class="fa-solid fa-robot"></i> Жүйе автоматты тапты</span>'} · ${escapeHtml(doc.detector || '—')}</span></div>
+          <div class="field"><span class="field-key">Анықталған уақыт</span><span class="field-val">${escapeHtml(doc.timestamp_human || shortDate(doc.timestamp))}</span></div>
+          <div class="field"><span class="field-key">Жауапты бағыт</span><span class="field-val">${escapeHtml(doc.responsible_org || 'ЕКЦ 109 диспетчерлік кезегі')}</span></div>
+          ${doc.external_ticket_id ? `<div class="field"><span class="field-key">109 өтінімі</span><span class="field-val"><b>${escapeHtml(doc.external_ticket_id)}</b>${doc.external_ticket_status ? ` · ${escapeHtml(doc.external_ticket_status)}` : ''}</span></div>` : ''}
+        </div>
+        ${renderDeliveryBlock(doc)}
+        <div class="detail-section"><p class="section-title">Әрекеттер тарихы</p></div>
+        <div class="history">
+          ${(doc.history || []).map((item) => `<div class="history-item">
+            <span class="history-dot"></span>
+            <span><b>${escapeHtml(STATUS_LABEL[item.status] || item.status)}</b>${item.note ? ` · ${escapeHtml(item.note)}` : ''}<br><small>${escapeHtml(shortDate(item.created_at))} · ${escapeHtml(item.actor || 'system')}</small></span>
+          </div>`).join('') || '<div class="empty">Тарих жазбасы жоқ</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="actions full-actions">
+      ${decideActions(c, '-full')}
+      <button class="btn btn-ghost" data-act="location"><i class="fa-solid fa-location-crosshairs"></i> Орнын нақтылау</button>
+      <button class="btn btn-ghost" data-act="docx"><i class="fa-solid fa-file-word"></i> Word</button>
+      <button class="btn btn-ghost" data-act="whatsapp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+      <button class="btn btn-ghost" data-act="pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+
+      ${['sent', 'submitted', 'registered', 'assigned'].includes(doc.status) ? '<button class="btn btn-warning span-2" data-act="progress"><i class="fa-solid fa-person-digging"></i> Жұмыс басталды деп белгілеу</button>' : ''}
+      ${doc.status === 'in_progress' ? '<button class="btn btn-primary span-2" data-act="after"><i class="fa-solid fa-camera"></i> Орындалғаннан кейінгі фотоны қосу</button><input type="file" id="after-file" accept="image/jpeg,image/png" hidden>' : ''}
+      ${doc.status === 'repaired' ? '<button class="btn btn-primary" data-act="close-work"><i class="fa-solid fa-circle-check"></i> Қайта тексерілді — жабу</button><button class="btn btn-danger" data-act="reopen"><i class="fa-solid fa-rotate-left"></i> Ақау қалды — қайта ашу</button>' : ''}
+      ${doc.status === 'reopened' ? '<button class="btn btn-warning span-2" data-act="resume"><i class="fa-solid fa-person-digging"></i> Қайта жөндеуге беру</button>' : ''}
+    </div>`;
+
+  modal('full-modal', true);
+  bindDocActions($('full-body'), c, '-full');
+  bindMediaTabs($('full-body'), c);
+  bindLightbox('full-media');
+}
+
+/* Екі деңгейдегі батырмалар бір жерде байланады — қайталанбауы үшін */
+function bindDocActions(root, c, suffix) {
+  const id = c.doc.event_id;
+  const go = (name, fn) => {
+    const node = root.querySelector('[data-act="' + name + '"]');
+    if (node) node.onclick = fn;
+  };
+  go('confirm' + suffix, () => { modal('full-modal', false); confirmAndSend(id); });
+  go('ikomek' + suffix, () => { modal('full-modal', false); openIkomek(id); });
+  go('reject' + suffix, () => { modal('full-modal', false); openReject(id); });
+  go('coords', () => copyText(c.lat.toFixed(6) + ', ' + c.lon.toFixed(6), 'Координата көшірілді'));
+  go('location', () => { modal('full-modal', false); startLocationCorrection(id); });
+  go('docx', () => { location.href = '/api/documents/' + encodeURIComponent(id) + '/docx'; });
+  go('print', () => window.open('/documents/' + encodeURIComponent(id) + '/print', '_blank', 'noopener'));
+  go('pdf', () => window.open('/api/documents/' + encodeURIComponent(id) + '/pdf', '_blank', 'noopener'));
+  go('ikomek', () => openIkomek(id));
+  go('whatsapp', async () => {
+    try {
+      const data = await fetch('/api/documents/' + encodeURIComponent(id) + '/whatsapp').then((r) => r.json());
+      window.open(data.link, '_blank', 'noopener');
+    } catch (error) { toast('WhatsApp сілтемесі жасалмады', 'error'); }
+  });
+  go('progress', () => setStatus(id, 'in_progress', 'Жауапты орындаушы жұмысты бастады'));
+  go('close-work', () => setStatus(id, 'closed', 'Қайта тексеру: ақау жойылған'));
+  go('reopen', () => setStatus(id, 'reopened', 'Қайта тексеру: ақау сақталған'));
+  go('resume', () => setStatus(id, 'in_progress', 'Қайта жөндеуге берілді'));
+  const after = root.querySelector('[data-act="after"]');
+  if (after) {
+    const input = root.querySelector('#after-file');
+    after.onclick = () => input && input.click();
+    if (input) input.onchange = () => uploadAfterPhoto(id, input.files[0]);
+  }
+}
+
+function bindMediaTabs(root, c) {
+  const doc = c.doc;
+  root.querySelectorAll('.media-tab').forEach((tab) => {
     tab.onclick = () => {
-      detail.querySelectorAll('.media-tab').forEach((item) => item.classList.remove('active'));
+      root.querySelectorAll('.media-tab').forEach((item) => item.classList.remove('active'));
       tab.classList.add('active');
-      const box = $('media-box');
-      if (tab.dataset.tab === 'video') box.innerHTML = `<video src="${mediaBase}/${attr(doc.video_file)}" controls autoplay muted loop></video>`;
-      else if (tab.dataset.tab === 'after') box.innerHTML = `<img src="${mediaBase}/${attr(doc.after_photo_file)}" alt="Орындалғаннан кейінгі фото">`;
-      else box.innerHTML = `<img src="${mediaBase}/${attr(doc.photo_file)}" alt="Ақаудың фотофиксациясы">`;
+      const box = root.querySelector('#full-media');
+      if (tab.dataset.tab === 'video') {
+        box.innerHTML = '<video src="' + c.mediaBase + '/' + attr(doc.video_file) + '" controls playsinline></video>';
+      } else if (tab.dataset.tab === 'after') {
+        box.innerHTML = '<img src="' + c.mediaBase + '/' + attr(doc.after_photo_file) + '" alt="Орындалғаннан кейінгі фото">';
+      } else {
+        box.innerHTML = '<img src="' + c.mediaBase + '/' + attr(doc.photo_file) + '" alt="Ақаудың фотофиксациясы">';
+      }
+      bindLightbox('full-media');
     };
   });
-
-  const marker = state.markers[eventId];
-  if (marker) state.map.panTo(marker.getLatLng(), { animate: true, duration: .35 });
 }
-window.openIncident = openDetail;
 
 function syncUrlEvent(eventId) {
   const url = new URL(location.href);
   if (eventId) url.searchParams.set('event', eventId);
   else url.searchParams.delete('event');
   history.replaceState(null, '', url);
+}
+
+/* ============================================================
+   Кезек: шешім қабылданған оқиға БІРДЕН тізімнен кетеді
+   ------------------------------------------------------------
+   Бұрын шешім қабылдағаннан кейін бет қайта жүктеліп, сол оқиға
+   қайтадан ашылатын. Оператор «мен мұны әлі қараған жоқпын ба?»
+   деп шатасатын. Енді:
+     1) карточка бірден өшеді (серверді күтпейміз);
+     2) КЕЛЕСІ оқиға өзі ашылады — кезекпен жұмыс істеу үшін;
+     3) кезек бітсе, панель жабылып, «бәрі қаралды» деп жазылады.
+   ============================================================ */
+function advanceQueue(eventId, message, kind = 'ok') {
+  const order = state.visibleDocuments.map((doc) => doc.event_id);
+  const index = order.indexOf(eventId);
+
+  // Тізімнен алып тастаймыз — сервер жауабын күтпей
+  state.dismissed.add(eventId);
+  state.documents = state.documents.filter((doc) => doc.event_id !== eventId);
+  state.visibleDocuments = state.visibleDocuments.filter((doc) => doc.event_id !== eventId);
+  state.reviewedCount = (state.reviewedCount || 0) + 1;
+
+  // Орнына келген оқиға, болмаса алдыңғысы
+  const next = state.visibleDocuments[index] || state.visibleDocuments[index - 1] || null;
+
+  state.selectedId = null;
+  renderList();
+
+  if (next) {
+    openDetail(next.event_id);
+    toast(`${message} · кезекте тағы ${state.visibleDocuments.length}`, kind);
+  } else {
+    closeDetail();
+    toast(`${message} · кезек бос`, kind);
+  }
+
+  // Статистиканы фонда жаңартамыз — интерфейс күтіп тұрмайды
+  loadData().catch(() => {});
 }
 
 function closeDetail() {
@@ -987,9 +1735,28 @@ async function saveCorrectedLocation(latlng) {
   openDetail(eventId);
 }
 
+const CHANNEL_LABEL = {
+  ekc109: 'ЕКЦ 109',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
+};
+
 async function confirmAndSend(eventId) {
   if (!requireAuth()) return;
-  if (!window.confirm('Оператор деректерді тексерді ме? Өтінім ЕКЦ 109 демо-арнасына жіберіледі.')) return;
+
+  // Оператор БАСПАС БҰРЫН өтінімнің қайда кететінін көруі керек
+  const health = await fetch('/api/delivery/health').then((r) => r.json()).catch(() => ({}));
+  const ready = Object.entries(health)
+    .filter(([, s]) => s && s.configured)
+    .map(([key]) => CHANNEL_LABEL[key] || key);
+  const target = health.email?.configured ? `\nАлушы: ${health.email.to}` : '';
+  const where = ready.length
+    ? `${ready.join(', ')}${target}`
+    : 'сыртқы арна бапталмаған — тек аудит журналына жазылады';
+
+  if (!window.confirm(`Оператор деректерді тексерді ме?\n\nӨтінім жіберіледі: ${where}`)) return;
+
   const response = await fetch(`/api/documents/${encodeURIComponent(eventId)}/confirm`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({}),
   });
@@ -998,9 +1765,46 @@ async function confirmAndSend(eventId) {
     return toast(error.detail || 'Өтінім жіберілмеді', 'error');
   }
   const result = await response.json();
-  toast(result.delivery?.ticket_id ? `ЕКЦ 109 № ${result.delivery.ticket_id}` : 'Өтінім ЕКЦ 109-ға жіберілді', 'ok');
-  await loadData();
-  openDetail(eventId);
+  const delivery = result.delivery || {};
+  const sent = (delivery.delivered || []).map((key) => CHANNEL_LABEL[key] || key);
+
+  // Растау мен 109-ға жүгіну — БІР әрекеттің жалғасы. Оператор екінші
+  // батырманы іздемеуі керек: 109 терезесі өзі ашылады да, мәтіні
+  // дайын тұрады. Жіберу-жібермеу — оның шешімі.
+  if (delivery.ikomek) setTimeout(() => openIkomek(eventId), 400);
+
+  advanceQueue(
+    eventId,
+    sent.length ? `Жіберілді: ${sent.join(', ')}` : `Кезекке қойылды · № ${delivery.ticket_id || ''}`,
+    sent.length ? 'ok' : 'warn',
+  );
+}
+
+/* Жеткізу квитанциясы — өтінім ҚАЙ арнамен кеткені.
+   Бұл блок жоқ болса, «жіберілді» деген сөз тексерілмейді. */
+function renderDeliveryBlock(doc) {
+  const attempts = doc.delivery_attempts || [];
+  if (!attempts.length) return '';
+  const last = attempts[attempts.length - 1];
+  const channels = last.channels;
+  if (!channels) return '';
+
+  const rows = Object.entries(channels).map(([key, state]) => {
+    const badge = state.ok ? 'st-sent' : (state.configured ? 'st-rejected' : 'st-new');
+    const mark = state.ok ? 'жетті' : (state.configured ? 'жетпеді' : 'бапталмаған');
+    return `<div class="field">
+      <span class="field-key">${escapeHtml(CHANNEL_LABEL[key] || key)}</span>
+      <span class="field-val"><span class="badge ${badge}">${mark}</span>
+        <small>${escapeHtml(state.detail || '')}</small></span>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="detail-section"><p class="section-title">Жеткізу квитанциясы</p></div>
+    <div class="fields">${rows}
+      <div class="field"><span class="field-key">Әрекет уақыты</span>
+        <span class="field-val">${escapeHtml(shortDate(last.created_at))} · ${escapeHtml(last.actor || 'operator')}</span></div>
+    </div>`;
 }
 
 function openReject(eventId) {
@@ -1026,9 +1830,7 @@ async function submitReject() {
   }
   modal('reject-modal', false);
   state.pendingRejectId = null;
-  closeDetail();
-  await loadData();
-  toast('Оқиға жалған анықтау ретінде белгіленді', 'ok');
+  advanceQueue(eventId, 'Жалған анықтау деп белгіленді');
 }
 
 async function setStatus(eventId, status, note) {
@@ -1078,19 +1880,132 @@ function setLive(on) {
 }
 
 function bindEvents() {
-  $('filter-status').onchange = loadData;
-  $('filter-type').onchange = loadData;
+  const resetQueue = () => {
+    // Сүзгі ауысты — «қаралды» деген жасыру енді жарамсыз: басқа
+    // сүзгіде сол оқиға көрінуі керек (мыс. «109-ға жіберілді»)
+    state.dismissed.clear();
+    state.reviewedCount = 0;
+    loadData();
+  };
+  $('filter-status').onchange = resetQueue;
+  $('filter-type').onchange = resetQueue;
   $('filter-search').oninput = renderList;
   $('btn-refresh').onclick = async () => { await Promise.all([loadData(), loadZones()]); toast('Деректер жаңартылды', 'ok'); };
   $('btn-show-all').onclick = () => renderMarkers({ fit: true });
-  $('btn-export').onclick = () => { location.href = `/api/export.csv?status=${encodeURIComponent($('filter-status').value)}`; };
   $('live-switch').onchange = (event) => { setLive(event.target.checked); toast(event.target.checked ? 'Тікелей жаңарту қосылды' : 'Тікелей жаңарту тоқтатылды'); };
 
   ['incidents', 'roadworks', 'closures'].forEach((name) => {
     $(`layer-${name}`).onclick = () => setLayerVisibility(name, !state.layerVisibility[name]);
   });
 
-  $('btn-zone').onclick = () => { if (requireAuth()) { closeDetail(); setDrawing(true); } };
+  /* ---------- «Картаға қосу» мәзірі ---------- */
+  const menu = $('map-menu');
+  const menuBtn = $('btn-map-menu');
+  const closeMenu = () => { menu.hidden = true; menuBtn.setAttribute('aria-expanded', 'false'); };
+  menuBtn.onclick = (event) => {
+    event.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open;
+    menuBtn.setAttribute('aria-expanded', String(open));
+  };
+  /* Мәзірді жабу — CAPTURE фазасында.
+     Кәдімгі click оқиғасы жеткіліксіз: Leaflet карта контейнеріндегі
+     басылымды өзіне ұстап қалады да (stopPropagation), document-ке
+     жетпейді. Сондықтан мәзір картаны басқанда жабылмай тұрған.
+     pointerdown + capture — оны ешкім тоқтата алмайды. */
+  document.addEventListener('pointerdown', (event) => {
+    if (!$('map-menu-wrap').contains(event.target)) closeMenu();
+  }, true);
+  if (state.map) state.map.on('click movestart', closeMenu);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeMenu();
+  });
+
+  // Учаске түрі мәзірден таңдалады — модальда қайта іздеудің қажеті жоқ
+  menu.querySelectorAll('[data-kind]').forEach((item) => {
+    item.onclick = () => {
+      closeMenu();
+      if (!requireAuth()) return;
+      const radio = document.querySelector(`input[name="zone-kind"][value="${item.dataset.kind}"]`);
+      if (radio) radio.checked = true;
+      closeDetail();
+      setDrawing(true);
+    };
+  });
+
+  $('menu-photo').onclick = () => { closeMenu(); $('photo-input').click(); };
+  $('photo-input').onchange = (event) => {
+    const file = event.target.files[0];
+    event.target.value = '';
+    uploadPhoto(file);
+  };
+  $('menu-manual').onclick = () => { closeMenu(); openManual(null); };
+  $('menu-zones').onclick = () => { closeMenu(); openZonesPanel(); };
+
+  /* ---------- Хидердегі іздеу ---------- */
+  const geoBox = $('geo-results');
+  $('geo-input').oninput = (event) => {
+    const value = event.target.value;
+    $('geo-clear').hidden = !value;
+    clearTimeout(geoTimer);
+    geoTimer = setTimeout(() => geoLookup(value, geoBox, showFoundPoint), 380);
+  };
+  $('geo-input').onkeydown = (event) => {
+    if (event.key === 'Escape') { geoBox.hidden = true; event.target.blur(); }
+  };
+  $('geo-clear').onclick = () => {
+    $('geo-input').value = '';
+    $('geo-clear').hidden = true;
+    geoBox.hidden = true;
+    if (state.foundMarker) { state.map.removeLayer(state.foundMarker); state.foundMarker = null; }
+  };
+  document.addEventListener('pointerdown', (event) => {
+    if (!$('geo-search').contains(event.target)) geoBox.hidden = true;
+  }, true);
+
+  /* ---------- Қолмен енгізу ---------- */
+  $('komek-close').onclick = () => modal('komek-modal', false);
+  $('manual-close').onclick = () => modal('manual-modal', false);
+  $('manual-cancel').onclick = () => modal('manual-modal', false);
+  $('manual-save').onclick = submitManual;
+  $('man-photo-btn').onclick = () => $('man-photo').click();
+  $('man-photo').onchange = () => {
+    const file = $('man-photo').files[0];
+    $('man-photo-name').hidden = !file;
+    if (file) $('man-photo-name').textContent = 'Таңдалды: ' + file.name;
+  };
+  const manBox = $('man-results');
+  let manTimer = null;
+  $('man-addr').oninput = (event) => {
+    clearTimeout(manTimer);
+    manTimer = setTimeout(() => geoLookup(event.target.value, manBox, setManualPoint), 380);
+  };
+  $('man-pick').onclick = () => {
+    modal('manual-modal', false);
+    state.pickingForManual = true;
+    document.querySelector('.map-wrap').classList.add('location-mode');
+    $('location-hint').classList.add('show');
+    toast('Картадан ақаудың нақты нүктесін басыңыз');
+  };
+
+  /* ---------- Панельді жию ---------- */
+  $('theme-toggle').onclick = () => applyTheme(
+    document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+
+  const side = $('side-toggle');
+  const applySide = (collapsed) => {
+    document.body.classList.toggle('side-collapsed', collapsed);
+    side.querySelector('i').className = collapsed
+      ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-left';
+    localStorage.setItem('aiqyn_side', collapsed ? '1' : '0');
+    setTimeout(() => state.map && state.map.invalidateSize(), 320);
+  };
+  side.onclick = () => applySide(!document.body.classList.contains('side-collapsed'));
+  applySide(localStorage.getItem('aiqyn_side') === '1');
+  // Бет ашылғанда сақталған тема қолданылады (батырманың белгісі,
+  // карта тақтасы, theme-color — бәрі бір жерден)
+  applyTheme(localStorage.getItem('aiqyn_theme') || 'dark');
+  $('menu-boundary').onclick = () => { closeMenu(); toggleBoundary(); };
   $('zone-undo').onclick = undoDrawPoint;
   $('zone-cancel').onclick = () => setDrawing(false);
   $('zone-finish').onclick = finishDrawing;
@@ -1113,6 +2028,9 @@ function bindEvents() {
     toast(`Оператор: ${user}`, 'ok');
   };
   $('login-pass').onkeydown = (event) => { if (event.key === 'Enter') $('login-submit').click(); };
+
+  $('full-close').onclick = () => modal('full-modal', false);
+  $('zones-close').onclick = () => modal('zones-modal', false);
 
   $('reject-close').onclick = () => modal('reject-modal', false);
   $('reject-cancel').onclick = () => modal('reject-modal', false);
@@ -1145,25 +2063,59 @@ function bindEvents() {
       return;
     }
 
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      const docs = state.visibleDocuments;
+    /* Кезекпен жұмыс — қолмен, тінтуірсіз.
+       Оператор күніне ондаған оқиға қарайды: әр шешім үшін тінтуірді
+       алып, батырманы іздеу уақыт алады. j/k — жүру, Enter — растау,
+       x — жалған деп белгілеу. */
+    const docs = state.visibleDocuments;
+
+    if (['ArrowDown', 'ArrowUp', 'j', 'k', 'о', 'л'].includes(event.key)) {
       if (!docs.length) return;
       event.preventDefault();
+      const down = ['ArrowDown', 'j', 'о'].includes(event.key);
       const index = docs.findIndex((doc) => doc.event_id === state.selectedId);
-      const next = event.key === 'ArrowDown'
+      const next = down
         ? (index + 1) % docs.length
         : (index <= 0 ? docs.length - 1 : index - 1);
       openDetail(docs[next].event_id);
+      return;
+    }
+
+    if (!state.selectedId) return;
+    const current = state.documents.find((doc) => doc.event_id === state.selectedId);
+    if (!current || isReviewedStatus(current.status)) return;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      confirmAndSend(state.selectedId);
+    } else if (event.key === 'x' || event.key === 'ч') {
+      event.preventDefault();
+      openReject(state.selectedId);
     }
   });
 }
 
+/* Портал сайттың ішінде <iframe> болып та көрсетіледі («тірі көрініс»).
+   Ол жағдайда 5 секунд сайын сұрау жіберудің қажеті жоқ: көрініс статикалық
+   дәлел ретінде тұрады, ал үздіксіз сұрау сайттың желісін бос жүктейді. */
+const EMBEDDED = (() => {
+  try { return window.self !== window.top; } catch (e) { return true; }
+})();
+
 document.addEventListener('DOMContentLoaded', async () => {
+  if (EMBEDDED) document.body.classList.add('embedded');
+
   initMap();
   bindEvents();
   updateOperatorLabel();
   await Promise.all([loadZones(), loadData()]);
-  setLive(true);
+
+  if (EMBEDDED) {
+    const liveSwitch = $('live-switch');
+    if (liveSwitch) liveSwitch.checked = false;
+  } else {
+    setLive(true);
+  }
 
   const linked = new URLSearchParams(location.search).get('event');
   if (linked) openDetail(linked);

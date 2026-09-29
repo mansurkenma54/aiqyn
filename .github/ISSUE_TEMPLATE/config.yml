@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Сұрақ қою / Ask a question
+    url: https://t.me/abilmansurk
+    about: Bug емес, жай сұрақ болса — Telegram арқылы жазыңыз.
+  - name: 🔐 Қауіпсіздік / Security
+    url: https://github.com/mansurkenma54/aiqyn/blob/main/SECURITY.md
+    about: Осалдықты жария issue арқылы емес, жеке хабарлаңыз.

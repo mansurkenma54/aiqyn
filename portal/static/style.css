@@ -5,11 +5,11 @@
   --panel: #101013;
   --panel-2: #17171b;
   --panel-3: #1f1f24;
-  --fill: rgba(255, 255, 255, .055);
-  --fill-strong: rgba(255, 255, 255, .09);
-  --line: rgba(255, 255, 255, .075);
-  --line-strong: rgba(255, 255, 255, .14);
-  --glass: rgba(22, 22, 25, .78);
+  --fill: var(--fill);
+  --fill-strong: var(--fill-strong);
+  --line: var(--line);
+  --line-strong: var(--line-strong);
+  --glass: var(--glass);
   --text: #f5f5f7;
   --muted: #98989f;
   --muted-2: #63636b;
@@ -18,14 +18,22 @@
   --amber: #ffd60a;
   --amber-soft: #ffe14d;
   --green: #30d158;
-  --cyan: #64d2ff;
+  /* Бренд акценті — сайттағы --aq-teal-bright-пен бірдей.
+     Портал мен сайт бір өнім болып көрінуі керек (tokens.css). */
+  --cyan: #1adfe3;
   --blue: #0a84ff;
   --tint-red: rgba(255, 69, 58, .14);
   --tint-amber: rgba(255, 214, 10, .13);
   --tint-green: rgba(48, 209, 88, .13);
-  --tint-cyan: rgba(100, 210, 255, .13);
+  --tint-cyan: rgba(26, 223, 227, .13);
   --tint-blue: rgba(10, 132, 255, .16);
-  --tint-gray: rgba(255, 255, 255, .07);
+  --tint-gray: var(--fill);
+  /* Бет пен терезелердің фоны — тема ауысқанда осылар өзгереді */
+  --sheet:   rgba(18, 18, 21, .9);
+  --sheet-2: rgba(18, 18, 21, .82);
+  --scrim:   rgba(0, 0, 0, .6);
+  --map-tint: none;
+
   --radius-sm: 10px;
   --radius: 14px;
   --radius-lg: 20px;
@@ -33,7 +41,9 @@
   --shadow: 0 12px 40px rgba(0, 0, 0, .45);
   --shadow-soft: 0 4px 18px rgba(0, 0, 0, .3);
   --ease: cubic-bezier(.32, .72, .28, 1);
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, "Segoe UI Variable", "Segoe UI", Roboto, Arial, sans-serif;
+  /* Шрифт сайтпен ортақ — tokens.css ішінде жүктеледі */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -56,11 +66,11 @@ button, input, select, textarea { font: inherit; letter-spacing: inherit; }
 button, a, select, input, textarea { outline: none; -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, select:focus-visible,
 input:focus-visible, textarea:focus-visible {
-  box-shadow: 0 0 0 3.5px rgba(100, 210, 255, .3);
-  border-color: rgba(100, 210, 255, .55) !important;
+  box-shadow: 0 0 0 3.5px rgba(26, 223, 227, .3);
+  border-color: rgba(26, 223, 227, .55) !important;
 }
 
-::selection { background: rgba(100, 210, 255, .28); }
+::selection { background: rgba(26, 223, 227, .28); }
 
 .sr-only {
   position: absolute !important;
@@ -88,7 +98,7 @@ input:focus-visible, textarea:focus-visible {
   align-items: center;
   gap: 16px;
   padding: 0 18px;
-  background: rgba(9, 9, 11, .82);
+  background: var(--sheet-2);
   -webkit-backdrop-filter: blur(22px) saturate(1.5);
   backdrop-filter: blur(22px) saturate(1.5);
   border-bottom: 1px solid var(--line);
@@ -109,13 +119,16 @@ input:focus-visible, textarea:focus-visible {
   flex: 0 0 38px;
   border-radius: 11px;
   /* Векторлық логотип: кез келген экранда (Retina, 4K) анық көрінеді,
-     JPEG-тегі қысу дақтары жоқ. Бастапқы көзі — portal/logo.py */
-  background: #fff url('/logo.svg') center / 100% 100% no-repeat;
-  border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 2px 8px rgba(0,0,0,.35);
+     JPEG-тегі қысу дақтары жоқ. Бастапқы көзі — portal/logo.py
+     Ақ таблетка SVG-нің ӨЗ ІШІНДЕ, сондықтан мұнда фон да, жиек те
+     қосылмайды: әйтпесе логотип екі рамкаға түсіп қалады. */
+  background: url('/logo.svg') center / 100% 100% no-repeat;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
 }
 .brand-copy { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 6px; }
-.brand-copy strong { font-size: 16px; font-weight: 700; letter-spacing: .04em; }
+/* Бас беттегі құлыппен бірдей: «AI» жуан, қалғаны жіңішке */
+.brand-copy strong { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.brand-copy strong em { font-style: normal; font-weight: 300; }
 .brand-copy > span { color: var(--muted); font-weight: 500; font-size: 13px; }
 .brand-copy small { grid-column: 1 / -1; margin-top: 1px; color: var(--muted-2); font-size: 10.5px; font-weight: 500; white-space: nowrap; }
 
@@ -196,7 +209,7 @@ input:focus-visible, textarea:focus-visible {
 }
 .live-toggle input:checked + .switch-track { background: var(--green); }
 .live-toggle input:checked + .switch-track span { transform: translateX(15px); }
-.live-toggle input:focus-visible + .switch-track { box-shadow: 0 0 0 3.5px rgba(100, 210, 255, .3); }
+.live-toggle input:focus-visible + .switch-track { box-shadow: 0 0 0 3.5px rgba(26, 223, 227, .3); }
 .live-label { color: var(--muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
 .live-label i { margin-right: 5px; color: var(--green); font-size: 6px; }
 
@@ -286,12 +299,38 @@ input:focus-visible, textarea:focus-visible {
 .type-stats { padding: 10px 16px 12px; border-top: 1px solid var(--line); }
 .type-stats:empty { display: none; padding: 0; border: none; }
 
+/* Жиналмалы есеп: жабық тұрғанда бір ғана жол алады да, кезекке
+   орын босатады. Оператордың негізгі жұмысы — тізім, есеп емес. */
 .type-stats-head {
-  display: flex; justify-content: space-between; align-items: baseline;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
   font-size: 10px; text-transform: uppercase; letter-spacing: .8px;
-  color: var(--muted); font-weight: 600; margin-bottom: 8px;
+  color: var(--muted); font-weight: 600;
+  cursor: pointer; list-style: none; user-select: none;
+  padding: 3px 0; border-radius: 6px;
+  transition: color .14s ease;
 }
-.type-stats-head b { font-size: 13px; color: var(--text); }
+.type-stats-head::-webkit-details-marker { display: none; }
+.type-stats-head:hover { color: var(--text); }
+.type-stats-head b { margin-left: auto; font-size: 13px; color: var(--text); }
+.type-stats-head i { font-size: 9px; transition: transform .18s ease; }
+.type-stats-box[open] .type-stats-head { margin-bottom: 8px; }
+.type-stats-box[open] .type-stats-head i { transform: rotate(180deg); }
+
+/* Пернетақта көмегі — кезекпен жұмыс істеу тәсілін көрсетеді */
+.queue-hint {
+  margin: 0; padding: 0 16px 8px;
+  font-size: 10.5px; color: var(--muted-2); line-height: 1.9;
+}
+.queue-hint kbd {
+  display: inline-block; min-width: 16px; margin-right: 3px; padding: 1px 5px;
+  border-radius: 5px; border: 1px solid var(--line);
+  background: var(--fill);
+  font: 600 10px/1.5 ui-monospace, "SF Mono", Consolas, monospace; color: var(--muted);
+}
+.queue-done {
+  margin-left: 8px; padding: 2px 8px; border-radius: 100px;
+  background: rgba(48, 209, 88, .14); color: #4ade80; font-weight: 600;
+}
 
 .type-row {
   display: grid; grid-template-columns: 94px 1fr 26px;
@@ -321,10 +360,12 @@ input:focus-visible, textarea:focus-visible {
 .list { min-height: 0; flex: 1; overflow-y: auto; padding: 2px 10px 14px; }
 
 /* ---------- Оқиға карточкалары ---------- */
+/* Тығыздық: бір экранға көбірек оқиға сыюы керек. Карточка биіктігі
+   ~30% қысқарды — мәтін кішіреймей, ауа ғана азайды. */
 .card {
   width: 100%;
-  margin: 0 0 4px;
-  padding: 13px 12px;
+  margin: 0 0 3px;
+  padding: 10px 11px;
   display: block;
   text-align: left;
   background: transparent;
@@ -336,19 +377,49 @@ input:focus-visible, textarea:focus-visible {
 }
 .card:hover { background: var(--fill); }
 .card.active { background: var(--fill-strong); border-color: var(--line-strong); box-shadow: inset 3px 0 0 var(--card-accent, var(--red)); }
-.card-head { display: flex; align-items: flex-start; gap: 11px; }
-.card-icon {
-  width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center;
-  background: var(--fill-strong); border-radius: 10px; color: #d7d7dc; font-size: 13px;
+
+/* Кіші карточка: ДӘЛЕЛ + қысқа сипаттама + жылдам әрекет.
+   Оператор ашпай тұрып-ақ «бұл шынымен ақау ма» дегенді көзбен шешеді. */
+.card-main {
+  display: flex; align-items: flex-start; gap: 11px;
+  width: 100%; text-align: left; cursor: pointer;
 }
-.card-icon.high { color: var(--red-deep); background: var(--tint-red); }
-.card-icon.medium { color: var(--amber-soft); background: var(--tint-amber); }
+.card-thumb {
+  width: 62px; height: 46px; flex: 0 0 62px;
+  border-radius: 9px; object-fit: cover; display: block;
+  background: #16161a; border: 1px solid var(--line);
+}
+.card-thumb--empty {
+  display: grid; place-items: center;
+  color: var(--muted); font-size: 15px;
+}
+.card.active .card-thumb { border-color: var(--card-accent, var(--line-strong)); }
 .card-copy { min-width: 0; flex: 1; }
+
+/* Жылдам әрекеттер — тек тексерілмеген оқиғада. Курсор келгенде
+   немесе карточка таңдаулы тұрғанда шығады: тізім тыныш болуы керек. */
+.card-quick {
+  display: flex; gap: 6px; margin: 8px 0 0 73px;
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height .18s var(--ease), opacity .16s var(--ease), margin-top .18s var(--ease);
+}
+.card:hover .card-quick, .card.active .card-quick,
+.card:focus-within .card-quick { max-height: 40px; opacity: 1; }
+.card-act {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 27px; padding: 0 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--fill);
+  color: var(--muted); font-size: 11px; font-weight: 600;
+  transition: background .14s var(--ease), color .14s var(--ease), border-color .14s var(--ease);
+}
+.card-act.reject:hover { background: var(--tint-red); border-color: rgba(255,69,58,.45); color: var(--red-deep); }
+.card-act.open { margin-left: auto; }
+.card-act.open:hover { background: var(--tint-cyan); border-color: rgba(26,223,227,.4); color: var(--cyan); }
 .card-type { margin: 0 0 3px; font-size: 13px; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; }
 .card-addr { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-addr i { opacity: .6; margin-right: 2px; font-size: 10px; }
 .card-time { color: var(--muted-2); font-size: 10.5px; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.card-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 9px; }
+.card-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
 
 /* ---------- Белгілер (badges) ---------- */
 .badge {
@@ -438,10 +509,122 @@ input:focus-visible, textarea:focus-visible {
 .map-legend div { display: flex; align-items: center; gap: 8px; }
 .map-legend b { color: var(--text); font-weight: 650; }
 
+/* ---------- Бетті ауыстырғандағы экран ---------- */
+.page-leave {
+  position: fixed; inset: 0; z-index: 4000;
+  display: grid; place-items: center; align-content: center; gap: 24px;
+  background: var(--bg); opacity: 0;
+  animation: pageLeaveIn .28s var(--ease) forwards;
+}
+@keyframes pageLeaveIn { to { opacity: 1; } }
+.page-leave img { border-radius: 26px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+.page-leave span {
+  font-size: 13px; font-weight: 800; letter-spacing: .5em;
+  text-transform: uppercase; color: var(--text);
+}
+.page-leave i {
+  display: block; width: 160px; height: 2px; border-radius: 2px;
+  background: var(--line-strong); overflow: hidden; position: relative;
+}
+.page-leave i::after {
+  content: ""; position: absolute; inset: 0; width: 0; background: var(--cyan);
+  animation: pageLeaveBar .56s var(--ease) forwards;
+}
+@keyframes pageLeaveBar { to { width: 100%; } }
+
+/* ---------- ИИ талдауының блогы ----------
+   Бұрын ИИ айтқандар жалпы кестенің ішінде шашылып жататын.
+   Оператор «ИИ не деп жазды?» дегенді бір қарағанда көруі керек. */
+.ai-block {
+  margin: 10px 16px 4px; padding: 14px 16px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--fill);
+}
+.ai-block--ok   { border-color: rgba(48, 209, 88, .3);  background: var(--tint-green); }
+.ai-block--warn { border-color: rgba(255, 214, 10, .3); background: var(--tint-amber); }
+.ai-block--off  { color: var(--muted); }
+.ai-block--off p { margin: 0; font-size: 12.5px; line-height: 1.5; }
+
+.ai-head { display: flex; align-items: flex-start; gap: 11px; }
+.ai-icon {
+  width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center;
+  border-radius: 9px; background: rgba(255, 255, 255, .1); color: var(--text); font-size: 13px;
+}
+.ai-block--ok   .ai-icon { color: #6ee7a0; }
+.ai-block--warn .ai-icon { color: var(--amber-soft); }
+.ai-head b { display: block; font-size: 13.5px; font-weight: 650; }
+.ai-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+.ai-note {
+  margin: 11px 0 0; padding-top: 11px; border-top: 1px solid var(--line);
+  font-size: 13px; line-height: 1.55; color: var(--text);
+}
+.ai-rows { display: grid; gap: 8px; margin: 11px 0 0; padding-top: 11px; border-top: 1px solid var(--line); }
+.ai-rows > div { display: grid; grid-template-columns: 128px 1fr; gap: 12px; align-items: baseline; }
+.ai-rows dt { color: var(--muted); font-size: 11.5px; }
+.ai-rows dd { margin: 0; font-size: 12.5px; line-height: 1.5; }
+@media (max-width: 520px) { .ai-rows > div { grid-template-columns: 1fr; gap: 2px; } }
+
+/* ---------- Дәлелді толық өлшемде ашу ---------- */
+.media-hint {
+  margin: 6px 16px 0; color: var(--muted-2); font-size: 11px;
+  display: flex; align-items: center; gap: 6px;
+}
+.lightbox {
+  position: fixed; inset: 0; z-index: 3000;
+  display: grid; place-items: center; gap: 14px; grid-auto-flow: row;
+  padding: 32px;
+  background: rgba(4, 4, 6, .93);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: lbIn .2s var(--ease);
+}
+@keyframes lbIn { from { opacity: 0; } to { opacity: 1; } }
+.lightbox img, .lightbox video {
+  max-width: min(1400px, 96vw); max-height: 82vh;
+  border-radius: var(--radius); box-shadow: 0 30px 90px rgba(0, 0, 0, .7);
+}
+.lightbox-close {
+  position: absolute; top: 20px; right: 20px;
+  width: 44px; height: 44px; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .12); color: #fff; font-size: 17px; cursor: pointer;
+  transition: background .16s var(--ease);
+}
+.lightbox-close:hover { background: rgba(255, 255, 255, .22); }
+.lightbox-open {
+  color: var(--muted); font-size: 12.5px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.lightbox-open:hover { color: #fff; }
+
+/* ---------- Базалық карта жүктелмегендегі күй ----------
+   Демо офлайн өтуі мүмкін. Тақтайша келмесе де маркерлер координата
+   бойынша дұрыс орында тұрады — фон ғана торға ауысады, интерфейс
+   жұмысын жалғастырады. */
+.basemap-note {
+  position: absolute; z-index: 700; left: 50%; top: 16px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 9px 14px; border-radius: 999px;
+  background: rgba(255, 214, 10, .14);
+  border: 1px solid rgba(255, 214, 10, .38);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  color: var(--amber-soft); font-size: 11.5px; font-weight: 600;
+  box-shadow: var(--shadow-soft);
+}
+.basemap-note i { font-size: 12px; }
+
+body.basemap-offline #map,
+body.basemap-offline .leaflet-container {
+  background-color: #070708;
+  background-image:
+    linear-gradient(to right, var(--fill) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--fill) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
 /* ---------- Маркерлер мен учаскелер ---------- */
 .incident-pin { background: none !important; border: 0 !important; }
 .pin-wrap { position: relative; width: 38px; height: 44px; display: grid; place-items: start center; color: var(--pin, var(--red)); filter: drop-shadow(0 5px 8px rgba(0, 0, 0, .6)); transform-origin: 50% 100%; transition: transform .18s var(--ease); }
-.pin-wrap > i { font-size: 38px; line-height: 42px; -webkit-text-stroke: 1.5px rgba(5, 5, 6, .9); }
+.pin-wrap > i { font-size: 38px; line-height: 42px; -webkit-text-stroke: 1.5px var(--sheet); }
 .pin-wrap:hover { transform: translateY(-3px) scale(1.07); }
 .pin-wrap.approximate::before { content: ""; position: absolute; left: 3px; top: 1px; width: 30px; height: 30px; border: 2px dashed var(--amber-soft); border-radius: 50%; animation: approxPulse 2.2s ease-out infinite; }
 .pin-status { position: absolute; top: 2px; right: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--pin); border: 3px solid #070708; }
@@ -463,7 +646,7 @@ input:focus-visible, textarea:focus-visible {
 .zone-label.closed { color: var(--red-deep); }
 .zone-label.ignore { color: var(--muted); }
 .map-wrap.drawing #map, .map-wrap.location-mode #map { cursor: crosshair !important; }
-.draw-node { width: 13px; height: 13px; border: 3px solid rgba(5, 5, 6, .9); border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
+.draw-node { width: 13px; height: 13px; border: 3px solid var(--sheet); border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
 
 .draw-panel, .location-hint {
   position: absolute; z-index: 800; left: 50%; transform: translateX(-50%) translateY(-14px);
@@ -482,11 +665,14 @@ input:focus-visible, textarea:focus-visible {
 .location-hint { top: 16px; display: flex; align-items: center; gap: 10px; padding: 10px 11px 10px 15px; color: var(--cyan); font-size: 11.5px; font-weight: 500; }
 
 /* ---------- Детальдар панелі ---------- */
+/* Ашылған карточка картаның ЖАРТЫСЫН алады: онда бәрі болуы керек —
+   дәлел, деректер, растау, орнын нақтылау. 430px-те фото ұсақ болып,
+   оператор ақауды көзбен тексере алмайтын. */
 .detail {
   position: absolute; z-index: 750; top: 12px; right: 12px; bottom: 12px;
-  width: min(430px, calc(100% - 24px));
+  width: min(52%, calc(100% - 24px)); min-width: 380px;
   overflow-y: auto; overflow-x: hidden;
-  background: rgba(18, 18, 21, .9);
+  background: var(--sheet);
   -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5);
   border: 1px solid var(--line-strong); border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
@@ -497,7 +683,7 @@ input:focus-visible, textarea:focus-visible {
 .detail-head {
   position: sticky; top: 0; z-index: 3;
   display: flex; justify-content: space-between; gap: 12px; padding: 17px 18px 15px;
-  background: rgba(18, 18, 21, .82);
+  background: var(--sheet-2);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--line);
 }
@@ -508,7 +694,7 @@ input:focus-visible, textarea:focus-visible {
   border: 0; border-radius: 50%; background: var(--fill-strong); color: var(--muted); cursor: pointer;
   transition: background .16s var(--ease), color .16s var(--ease);
 }
-.close-x:hover, .modal-close:hover { color: var(--text); background: rgba(255, 255, 255, .14); }
+.close-x:hover, .modal-close:hover { color: var(--text); background: var(--line-strong); }
 .draft-banner, .registered-banner, .warn {
   margin: 12px 14px; padding: 11px 13px; border-radius: var(--radius-sm);
   font-size: 11px; line-height: 1.5; border: 0;
@@ -543,7 +729,7 @@ input:focus-visible, textarea:focus-visible {
 .actions {
   position: sticky; bottom: 0; z-index: 2;
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 13px 14px;
-  background: rgba(18, 18, 21, .82);
+  background: var(--sheet-2);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   border-top: 1px solid var(--line);
 }
@@ -559,7 +745,7 @@ input:focus-visible, textarea:focus-visible {
 .modal {
   display: none; position: fixed; z-index: 2200; inset: 0; padding: 24px;
   align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, .55);
+  background: var(--scrim);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .modal.open { display: flex; animation: modalFade .22s var(--ease); }
@@ -638,11 +824,13 @@ input:focus-visible, textarea:focus-visible {
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.ok { border-color: rgba(48, 209, 88, .4); color: #6ee7a0; }
 .toast.error { border-color: rgba(255, 69, 58, .4); color: var(--red-deep); }
+/* Жіберілді, бірақ сыртқы арна бапталмаған — қате де емес, толық сәтті де емес */
+.toast.warn { border-color: rgba(255, 201, 60, .45); color: #ffc93c; }
 
 /* ---------- Скроллбар ---------- */
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .24); }
 
 /* ---------- Адаптивті ---------- */
@@ -750,3 +938,394 @@ input:focus-visible, textarea:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+
+/* ---------- Учаскелер тізімі ---------- */
+.zones-list { display: grid; gap: 6px; margin-top: 14px; max-height: 46vh; overflow-y: auto; }
+.zone-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border-radius: 11px;
+  background: var(--fill); border: 1px solid var(--line);
+}
+.zone-dot { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; }
+.zone-copy { min-width: 0; flex: 1; display: grid; }
+.zone-copy b { font-size: 12.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone-copy small { color: var(--muted-2); font-size: 10.5px; }
+
+/* ---------- Хидер мәзірі ---------- */
+.topbar-spacer { flex: 1; }
+.menu-wrap { position: relative; }
+.menu-wrap .chev { font-size: 9px; opacity: .6; margin-left: 2px; }
+/* [hidden] МІНДЕТТІ: display: grid браузердің өз ережесін басып кетеді
+   де, мәзір ешқашан жабылмай қалады. Дәл сол қате болған. */
+.menu[hidden] { display: none; }
+.menu {
+  position: absolute; z-index: 1400; top: calc(100% + 8px); right: 0;
+  width: 268px; padding: 6px; display: grid; gap: 2px;
+  background: var(--glass); border: 1px solid var(--line-strong);
+  border-radius: 16px; box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+}
+.menu button {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 10px; border: 0; border-radius: 11px; cursor: pointer;
+  background: transparent; color: inherit; text-align: left;
+  transition: background .14s var(--ease);
+}
+.menu button:hover { background: var(--fill-strong); }
+.menu button > i { width: 17px; text-align: center; font-size: 13px; }
+.menu button span { display: grid; min-width: 0; }
+.menu button b { font-size: 12.5px; font-weight: 650; }
+.menu button small { color: var(--muted-2); font-size: 10.5px; }
+.menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--line); }
+
+/* ============================================================
+   Карточканың екі деңгейі
+   ============================================================ */
+
+/* 1) Кіші панель — жылдам шешім. Ені қайта ықшамдалды: бұл шешім
+      қабылдайтын жер, зерттейтін жер емес. */
+.detail { width: min(400px, calc(100% - 24px)) !important; min-width: 0 !important; }
+.media--sm img, .media--sm video { max-height: 210px; object-fit: cover; }
+
+/* Төрт негізгі дерек — қалғаны «Толығырақ» ішінде */
+.quick-facts {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  margin: 14px 16px 0; border-radius: 13px; overflow: hidden;
+  background: var(--line);
+}
+.quick-facts > div { padding: 10px 12px; background: var(--panel-2); display: grid; gap: 3px; }
+.quick-facts span { color: var(--muted-2); font-size: 10px; font-weight: 650;
+                    letter-spacing: .07em; text-transform: uppercase; }
+.quick-facts b { font-size: 12.5px; font-weight: 600; line-height: 1.35;
+                 overflow: hidden; text-overflow: ellipsis; }
+
+.more-btn {
+  width: calc(100% - 32px); margin: 12px 16px 0; height: auto; padding: 11px 14px;
+  display: grid; gap: 2px; justify-items: center; text-align: center;
+}
+.more-btn small { color: var(--muted-2); font-size: 10.5px; font-weight: 500; }
+
+/* 2) Үлкен терезе */
+.modal--full .modal-full-box {
+  width: min(1180px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 26px 28px 24px;
+}
+.full-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 20px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.full-head h2 { margin: 2px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.full-head .draft-banner, .full-head .registered-banner { margin: 0; flex: 0 1 auto; }
+
+.full-grid { display: grid; gap: 24px; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+@media (max-width: 940px) { .full-grid { grid-template-columns: 1fr; } }
+.full-left .media img, .full-left .media video { max-height: 460px; }
+.full-left .detail-section, .full-right .detail-section { padding-left: 0; padding-right: 0; }
+.full-right .fields, .full-left .doc-text, .full-right .history { padding-left: 0; padding-right: 0; }
+
+.full-actions {
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+/* Барлық [hidden] элемент шынымен жасырылсын: жоба ішінде display
+   қоятын ережелер көп, олар браузердің өз ережесін басып кетеді. */
+[hidden] { display: none !important; }
+
+/* Үлкен терезедегі әрекеттер жолағы жабысып тұрмайды: терезенің өзі
+   айналдырылады, ал жабысқан жолақ мәтіннің үстін жауып қалатын. */
+.modal--full .full-actions {
+  position: static; background: transparent;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  padding-left: 0; padding-right: 0;
+}
+/* Жабу белгісі баннермен қабаттаспауы үшін тақырып жолағы оңнан
+   бос орын қалдырады */
+.modal--full .full-head { padding-right: 44px; }
+
+/* ============================================================
+   Хидердегі іздеу
+   ============================================================ */
+.geo-search { position: relative; flex: 1; max-width: 460px; margin: 0 12px; }
+.geo-search > i {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--muted-2); font-size: 12px; pointer-events: none;
+}
+.geo-search input {
+  width: 100%; height: 38px; padding: 0 34px 0 34px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--fill); color: var(--text); font-size: 13px;
+}
+.geo-search input::placeholder { color: var(--muted-2); }
+.geo-search input::-webkit-search-cancel-button { display: none; }
+.geo-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; display: grid; place-items: center;
+  border: 0; border-radius: 7px; background: transparent;
+  color: var(--muted-2); cursor: pointer;
+}
+.geo-clear:hover { background: var(--fill-strong); color: var(--text); }
+
+.geo-results {
+  position: absolute; z-index: 1400; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: 320px; overflow-y: auto; padding: 5px;
+  background: var(--glass); border: 1px solid var(--line-strong);
+  border-radius: 14px; box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+}
+.geo-results--inline { position: static; margin-top: 6px; box-shadow: none; max-height: 190px; }
+.geo-item {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  padding: 8px 10px; border: 0; border-radius: 10px; cursor: pointer;
+  background: transparent; color: inherit; text-align: left;
+}
+.geo-item:hover { background: var(--fill-strong); }
+.geo-item > i { margin-top: 2px; width: 14px; color: var(--cyan); font-size: 12px; }
+.geo-item span { display: grid; min-width: 0; }
+.geo-item b { font-size: 12.5px; font-weight: 650; }
+.geo-item small { color: var(--muted-2); font-size: 10.5px;
+                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geo-empty { padding: 12px; color: var(--muted-2); font-size: 12px; text-align: center; }
+
+.pop { display: grid; gap: 5px; min-width: 190px; }
+.pop b { font-size: 13px; }
+.pop span { color: var(--muted); font-size: 11px; }
+.pop-coords { font-family: var(--font-mono); font-size: 10.5px !important; }
+.pop .btn { margin-top: 4px; }
+
+/* ============================================================
+   Қолмен енгізу анкетасы — бір экранға сыяды
+   ============================================================ */
+.ask { display: grid; gap: 12px; margin: 18px 0 4px; }
+.ask-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: start; }
+.ask-n {
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px;
+  background: var(--fill-strong); color: var(--muted);
+  font: 700 11px/1 var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.ask-body { min-width: 0; display: grid; gap: 6px; }
+.ask-q { font-size: 12.5px; font-weight: 650; color: var(--text); }
+.ask-q b { color: var(--red-deep); }
+.ask-q small { color: var(--muted-2); font-weight: 500; }
+.ask-body select, .ask-body textarea, .ask-body input[type="text"], .ask-body input[type="search"] {
+  width: 100%; min-height: 38px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 11px;
+  background: var(--fill); color: var(--text); font-size: 13px;
+}
+.ask-body textarea { resize: vertical; line-height: 1.5; }
+.ask-place { display: flex; gap: 8px; flex-wrap: wrap; }
+.ask-place input { flex: 1 1 200px; }
+.ask-place .btn { flex: 0 0 auto; }
+.ask-point { margin: 0; color: var(--muted-2); font-size: 11px; }
+.ask-point.ok { color: var(--green); }
+
+.sev-picker { display: flex; gap: 6px; }
+.sev-picker input { position: absolute; opacity: 0; pointer-events: none; }
+.sev-picker label { flex: 1; }
+.sev-picker span {
+  display: block; padding: 8px 10px; text-align: center; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--fill); font-size: 12.5px; font-weight: 600; color: var(--muted);
+  transition: background .14s var(--ease), color .14s var(--ease), border-color .14s var(--ease);
+}
+.sev-picker label:hover span { background: var(--fill-strong); }
+.sev-picker input:checked + span { background: var(--tint-cyan); border-color: rgba(26,223,227,.45); color: var(--cyan); }
+
+/* ============================================================
+   Панельді жию
+   ============================================================ */
+.side-toggle {
+  width: 28px; height: 28px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+  background: var(--fill); color: var(--muted); font-size: 11px;
+  transition: background .14s var(--ease), color .14s var(--ease);
+}
+.side-toggle:hover { background: var(--fill-strong); color: var(--text); }
+/* Жиналғанда ТОР БАҒАНАСЫ тарылуы керек, панельдің өз ені емес:
+   әйтпесе баған 356px күйінде қалады да, картаның сол жағында бос
+   қара алаң пайда болады. */
+.layout { transition: grid-template-columns .28s var(--ease); }
+body.side-collapsed .layout { grid-template-columns: 54px minmax(0, 1fr); }
+body.side-collapsed .sidebar { overflow: hidden; }
+body.side-collapsed .sidebar > *:not(.sidebar-head) { display: none; }
+body.side-collapsed .sidebar-head { flex-direction: column; gap: 10px; padding: 12px 8px; }
+body.side-collapsed .sidebar-head > div, body.side-collapsed .connection-pill { display: none; }
+
+/* Үлкен терезе БІР ЭКРАНҒА сыяды: терезенің өзі айналдырылмайды,
+   тақырып пен әрекеттер жолағы әрқашан көрініп тұрады, ал екі баған
+   керек болса ішінен ғана айналдырылады. */
+.modal--full .modal-full-box {
+  display: flex; flex-direction: column;
+  height: calc(100vh - 48px); overflow: hidden;
+}
+.modal--full .full-head { flex: 0 0 auto; }
+.modal--full .full-grid { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.modal--full .full-left, .modal--full .full-right {
+  min-height: 0; overflow-y: auto; padding-right: 6px;
+}
+.modal--full .full-actions { flex: 0 0 auto; margin-top: 0; }
+.modal--full .full-left .media img,
+.modal--full .full-left .media video { max-height: 42vh; }
+
+/* Әрекеттер жолағы ықшам: үш қатарға жайылып, терезенің жартысын
+   алып кетпеуі керек. Тор емес, бір жолға тізілген батырмалар. */
+.modal--full .full-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding-top: 14px; margin-top: 14px;
+}
+.modal--full .full-actions .btn { flex: 1 1 auto; min-width: 150px; height: 40px; }
+.modal--full .full-actions .btn.span-2 { flex: 1 1 260px; }
+
+/* flex-basis: 0 — МІНДЕТТІ. `auto` болса тор өз мазмұнының биіктігін
+   алады да, қалған орынға сыймай, әрекеттер жолағы қиылып қалады. */
+.modal--full .full-grid { flex: 1 1 0; min-height: 0; }
+
+/* Flex-пен таласпай, бағандардың биіктігін ТІКЕЛЕЙ шектейміз:
+   тақырып (~95px) + әрекеттер (~130px) + шеттер (~50px) алынып,
+   қалғаны бағандарға беріледі. Сонда терезе экраннан аспайды. */
+.modal--full .full-left, .modal--full .full-right {
+  max-height: calc(100vh - 345px); overflow-y: auto;
+}
+
+/* ============================================================
+   iKomek 109 — ресми байланыс арнасы
+   ============================================================ */
+.btn-komek {
+  background: #25d366; color: #04310f; border-color: #25d366;
+  display: grid; gap: 1px; height: auto; padding: 10px 16px; text-align: center;
+}
+.btn-komek:hover { background: #1fbe5b; border-color: #1fbe5b; }
+.btn-komek small { font-size: 10.5px; font-weight: 500; opacity: .8; }
+
+.komek-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+.komek-badge {
+  width: 46px; height: 46px; flex: 0 0 46px; display: grid; place-items: center;
+  border-radius: 14px; background: rgba(37, 211, 102, .14); color: #25d366; font-size: 18px;
+}
+.komek-head h2 { margin: 2px 0 3px; font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.komek-note {
+  margin: 0 0 14px; padding: 11px 13px; border-radius: 12px;
+  background: rgba(37, 211, 102, .08); border: 1px solid rgba(37, 211, 102, .22);
+  color: var(--muted); font-size: 12.5px; line-height: 1.55;
+}
+.komek-ways { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.komek-ways .btn { text-decoration: none; }
+.komek-text {
+  margin: 8px 0 0; padding: 13px 15px; max-height: 210px; overflow-y: auto;
+  border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line);
+  color: var(--muted); font: 400 11.5px/1.7 var(--font-mono);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+
+/* ============================================================
+   АҚ ТЕМА
+   ------------------------------------------------------------
+   Күндіз, әсіресе проекторда, қара интерфейс оқылмайды. Тек
+   палитра ауысады — құрылым да, өлшемдер де сол күйінде қалады.
+   Түстер осы файлдағы айнымалылар арқылы ғана берілгендіктен,
+   ауысу толық жүреді.
+   ============================================================ */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --panel: #ffffff;
+  --panel-2: #f7f7f5;
+  --panel-3: #eeeeeb;
+  --fill: rgba(11, 11, 12, .045);
+  --fill-strong: rgba(11, 11, 12, .085);
+  --line: rgba(11, 11, 12, .10);
+  --line-strong: rgba(11, 11, 12, .17);
+  --glass: rgba(255, 255, 255, .86);
+  --sheet: rgba(255, 255, 255, .95);
+  --sheet-2: rgba(255, 255, 255, .88);
+  --scrim: rgba(20, 20, 22, .35);
+  --text: #0a0a0a;
+  --muted: #5a5a56;
+  --muted-2: #77776f;
+  --red: #c2381a;
+  --red-deep: #d9422a;
+  --amber: #a06f00;
+  --amber-soft: #8a6200;
+  --green: #0b6a49;
+  --cyan: #00747e;
+  --blue: #0a63c4;
+  --tint-red: rgba(194, 56, 26, .10);
+  --tint-amber: rgba(160, 111, 0, .12);
+  --tint-green: rgba(11, 106, 73, .10);
+  --tint-cyan: rgba(0, 116, 126, .10);
+  --tint-blue: rgba(10, 99, 196, .10);
+  --tint-gray: rgba(11, 11, 12, .06);
+  --shadow: 0 12px 40px rgba(20, 20, 25, .14);
+  --shadow-soft: 0 4px 18px rgba(20, 20, 25, .10);
+}
+
+/* Хидер ақ темада да қою қалады: бренд жолағы ретінде оқылады,
+   ал астындағы жұмыс алаңы ашық болады. */
+html[data-theme="light"] .topbar {
+  background: rgba(255, 255, 255, .86);
+  border-bottom-color: var(--line);
+}
+html[data-theme="light"] .topbar .brand-copy strong,
+html[data-theme="light"] .topbar .brand-copy > span { color: var(--text); }
+
+/* Карта тақтасы ақ нұсқаға ауысады (app.js ішінде), ал маркердің
+   көлеңкесі жеңілдейді */
+html[data-theme="light"] .pin-wrap { filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .25)); }
+
+/* Ақ фонда жасыл/қызыл белгілер тым ашық болмауы керек */
+html[data-theme="light"] .badge { border: 1px solid var(--line); }
+html[data-theme="light"] .btn-komek { color: #04310f; }
+html[data-theme="light"] .komek-text,
+html[data-theme="light"] .doc-text { color: var(--text); }
+
+/* Ақ темада қауіпті әрекет бозарып кетпеуі керек: «жалған анықтау»
+   деген шешім көрініп тұруы тиіс */
+html[data-theme="light"] .btn-danger {
+  background: rgba(194, 56, 26, .10);
+  border-color: rgba(194, 56, 26, .35);
+  color: #a32c12;
+}
+html[data-theme="light"] .btn-danger:hover {
+  background: rgba(194, 56, 26, .18); border-color: rgba(194, 56, 26, .5);
+}
+html[data-theme="light"] .btn-ghost { border-color: var(--line-strong); }
+
+/* Аналитикадағы карточкалар ақ фонда «шыны» емес, қағаз болып тұрсын */
+html[data-theme="light"] .an-card,
+html[data-theme="light"] .an-ops-cell,
+html[data-theme="light"] .an-sec-n {
+  background: #ffffff; border-color: var(--line);
+}
+html[data-theme="light"] .an-card--flat { background: #fafaf8; }
+html[data-theme="light"] .an-stage-bar { background: rgba(11, 11, 12, .08); }
+
+/* Кіші панельдегі үш батырма — үшеуі де бір бағанда, бірдей биіктікте.
+   Бұрын біреуі екі жолды болып, қатар қисайып тұратын. */
+.detail .actions { grid-template-columns: 1fr; }
+.detail .actions .btn { height: 46px; padding: 0 16px; }
+.detail .actions .btn-komek {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+}
+
+/* Дереккөз белгісі: жүйе тапқан ба, әлде адам жазған ба — бұл
+   жауапкершіліктің де, сенімнің де айырмасы */
+.badge.src-auto { background: var(--tint-cyan); color: var(--cyan); }
+.badge.src-manual { background: var(--tint-amber); color: var(--amber-soft); }
+
+/* Сурет өңделіп жатқан кездегі индикатор */
+.photo-progress {
+  position: fixed; z-index: 3000; left: 50%; bottom: 26px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 13px 18px;
+  border-radius: 14px; background: var(--glass); border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+}
+.photo-progress i { color: var(--cyan); font-size: 15px; }
+.photo-progress span { display: grid; }
+.photo-progress b { font-size: 12.5px; }
+.photo-progress small { color: var(--muted-2); font-size: 11px; }

@@ -82,12 +82,9 @@
 <script>
 const EVENT_ID = "__EVENT_ID__";
 
-const LOGO = `<svg class="logo" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="22" fill="#111"/>
-  <ellipse cx="50" cy="50" rx="40" ry="25" transform="rotate(-38 50 50)" fill="#fff"/>
-  <path d="M50 33 L54.5 46 L67 50 L54.5 54 L50 67 L45.5 54 L33 50 L45.5 46 Z" fill="#111"/>
-  <circle cx="68" cy="33" r="6.5" fill="#ff2020"/>
-</svg>`;
+// Логотип БІР жерде — portal/logo.py ішінде — анықталады.
+// Бланкіде таблеткасыз нұсқа тұрады: қағаз бәрібір ақ.
+const LOGO = `__LOGO_SM__`;
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (c) =>
@@ -284,7 +281,7 @@ fetch(`/api/documents/${EVENT_ID}`)
         ${review ? `<tr><td class="k">Операторлық тексеру</td><td>${esc(reviewText)}</td></tr>` : ''}
         ${assignedOrg ? `<tr><td class="k">Тағайындалған орындаушы</td><td>${esc(assignedOrg)}</td></tr>` : ''}
         ${dueAt ? `<tr><td class="k">Жоспарлы орындалу мерзімі</td><td>${esc(displayTime(dueAt))}</td></tr>` : ''}
-        ${doc.ai_verified ? `<tr><td class="k">Қосымша AI бағасы</td>
+        ${doc.ai_verified ? `<tr><td class="k">Қосымша ЖИ бағасы</td>
           <td>Алдын ала талдау бар (${Math.round((doc.ai_confidence || 0) * 100)}%);
               инженерлік тексеруді алмастырмайды</td></tr>` : ''}
         <tr><td class="k">Дереккөз</td>
@@ -298,7 +295,7 @@ fetch(`/api/documents/${EVENT_ID}`)
       <div class="text" style="color:#333">${esc(doc.description_text_ru)}</div>
 
       <div class="notice">
-        Маңызды: AI-модельдің бағасы алдын ала сипатта болады және инженерлік тексеруді,
+        Маңызды: ЖИ-модельдің бағасы алдын ала сипатта болады және инженерлік тексеруді,
         нормативтік қорытындыны немесе жауапты органның шешімін алмастырмайды.
       </div>
 
@@ -336,7 +333,7 @@ fetch(`/api/documents/${EVENT_ID}`)
         ${esc(stateNote)}
         ${review ? `Операторлық тексеру: ${esc(reviewText)}.`
           : 'Оператор тексеруі құжат деректерімен расталмаған.'}
-        AI бағасы инженерлік тексеруді немесе жауапты органның шешімін алмастырмайды.
+        ЖИ бағасы инженерлік тексеруді немесе жауапты органның шешімін алмастырмайды.
         Жүйе тұлғаны немесе көлік нөмірін танымайды; тек инфрақұрылым ақауының
         белгілерін тіркейді. AIQYN оқиға ID: ${esc(doc.event_id)}.
       </div>
