@@ -611,10 +611,10 @@ async function openIkomek(eventId) {
 
     <div class="komek-ways">
       <a class="btn btn-komek" href="${attr(data.whatsapp)}" target="_blank" rel="noopener">
-        <i class="fa-brands fa-whatsapp"></i> WhatsApp арқылы жіберу
+        <i class="fa-solid fa-comment-dots"></i> WhatsApp арқылы жіберу
         <small>${escapeHtml(data.whatsapp_number)}</small></a>
       <a class="btn btn-ghost" href="${attr(data.telegram)}" target="_blank" rel="noopener">
-        <i class="fa-brands fa-telegram"></i> Telegram-бот</a>
+        <i class="fa-solid fa-paper-plane"></i> Telegram-бот</a>
       <a class="btn btn-ghost" href="${attr(data.phone)}">
         <i class="fa-solid fa-phone"></i> 109 нөміріне қоңырау</a>
       <a class="btn btn-ghost" href="/api/documents/${encodeURIComponent(eventId)}/pdf"
@@ -625,11 +625,16 @@ async function openIkomek(eventId) {
     <p class="section-title">Жіберілетін мәтін</p>
     <pre class="komek-text" id="komek-text">${escapeHtml(data.text)}</pre>
     <div class="modal-actions">
+      <span class="kbd-hints"><kbd>Enter</kbd> WhatsApp <kbd>C</kbd> көшіру <kbd>Esc</kbd> жабу</span>
       <button class="btn btn-ghost" id="komek-copy"><i class="fa-solid fa-copy"></i> Мәтінді көшіру</button>
       <button class="btn btn-ghost" id="komek-cancel">Жабу</button>
     </div>`;
 
   modal('komek-modal', true);
+  // Фокус WhatsApp батырмасында: Enter басу жеткілікті
+  const whatsapp = $('komek-body').querySelector('.btn-komek');
+  if (whatsapp) setTimeout(() => whatsapp.focus(), 50);
+  state.komekText = data.text;
   $('komek-copy').onclick = () => copyText(data.text, 'Өтініш мәтіні көшірілді');
   $('komek-cancel').onclick = () => modal('komek-modal', false);
 }
@@ -1424,13 +1429,35 @@ function decideActions(c, suffix) {
   // растау мен 109-ға жүгіну бір әрекет, екі бөлек батырма шатастырады.
   if (!c.reviewed) {
     return '<button class="btn btn-primary span-2" data-act="confirm' + suffix + '">'
-      + '<i class="fa-solid fa-paper-plane"></i> Тексеру және 109-ға жіберу</button>'
+      + '<i class="fa-solid fa-paper-plane"></i> <span class="btn-label">Растау және 109-ға жіберу</span></button>'
+      + '<p class="send-hint span-2"><i class="fa-solid fa-route"></i> Кетеді: '
+      + escapeHtml(state.deliveryLabel || 'iKomek 109 · аудит журналы') + '</p>'
       + '<button class="btn btn-danger span-2" data-act="reject' + suffix + '">'
       + '<i class="fa-solid fa-xmark"></i> Жалған деп белгілеу</button>';
   }
   // Расталып қойған оқиға: 109-ға қайта жүгінуге болады
   return '<button class="btn btn-komek span-2" data-act="ikomek' + suffix + '">'
-    + '<i class="fa-brands fa-whatsapp"></i> iKomek 109-ға жүгіну</button>';
+    + '<i class="fa-solid fa-comment-dots"></i> iKomek 109-ға жүгіну</button>';
+}
+
+/* Оператор шешім қабылдау үшін ең алдымен ЖИ не деп тапқанын көруі керек.
+   Бұрын бұл тек «Толығырақ» терезесінде тұратын — әр оқиға үшін бір қосымша басу. */
+function aiLine(doc) {
+  const checked = Boolean(doc.ai_model || doc.ai_note);
+  if (!checked) {
+    return '<div class="ai-line none"><i class="fa-solid fa-robot"></i>'
+      + '<span><b>ЖИ тексермеген</b> — фото мен видеоны өзіңіз қараңыз</span></div>';
+  }
+  const ok = Boolean(doc.ai_verified);
+  const pct = doc.ai_confidence ? ` · ${Math.round(doc.ai_confidence * 100)}%` : '';
+  const note = (doc.ai_note || '').replace(/\s+/g, ' ').trim();
+  const extra = [doc.ai_size, doc.ai_urgency_days ? `жөндеу мерзімі ~${doc.ai_urgency_days} күн` : '']
+    .filter(Boolean).join(' · ');
+  return `<div class="ai-line ${ok ? 'ok' : 'doubt'}"><i class="fa-solid fa-robot"></i><span>`
+    + `<b>${ok ? 'ЖИ растады' : 'ЖИ күмәнданды'}${pct}</b>`
+    + (note ? ` — ${escapeHtml(note.length > 150 ? note.slice(0, 150) + '…' : note)}` : '')
+    + (extra ? `<small>${escapeHtml(extra)}</small>` : '')
+    + '</span></div>';
 }
 
 async function openDetail(eventId) {
@@ -1474,12 +1501,16 @@ async function openDetail(eventId) {
       <div><span>Уақыты</span><b>${escapeHtml(doc.timestamp_human || shortDate(doc.timestamp))}</b></div>
     </div>
 
+    ${aiLine(doc)}
+
     <button class="btn btn-ghost more-btn" id="btn-more">
       <span><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Толығырақ ашу</span>
-      <small>дәлел, ЖИ талдауы, тарих, барлық әрекет</small>
+      <small>видео, ЖИ талдауы, тарих, барлық әрекет</small>
     </button>
 
-    <div class="actions">${decideActions(c, '')}</div>`;
+    <div class="actions">${decideActions(c, '')}</div>
+    ${c.reviewed ? '' : `<div class="kbd-hints"><kbd>Enter</kbd> растау <kbd>X</kbd> жалған
+      <kbd>J</kbd><kbd>K</kbd> келесі <kbd>Esc</kbd> жабу</div>`}`;
 
   detail.classList.add('open');
   detail.setAttribute('aria-hidden', 'false');
@@ -1560,7 +1591,7 @@ function openFull() {
       ${decideActions(c, '-full')}
       <button class="btn btn-ghost" data-act="location"><i class="fa-solid fa-location-crosshairs"></i> Орнын нақтылау</button>
       <button class="btn btn-ghost" data-act="docx"><i class="fa-solid fa-file-word"></i> Word</button>
-      <button class="btn btn-ghost" data-act="whatsapp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+      <button class="btn btn-ghost" data-act="whatsapp"><i class="fa-solid fa-comment-dots"></i> WhatsApp</button>
       <button class="btn btn-ghost" data-act="pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
 
       ${['sent', 'submitted', 'registered', 'assigned'].includes(doc.status) ? '<button class="btn btn-warning span-2" data-act="progress"><i class="fa-solid fa-person-digging"></i> Жұмыс басталды деп белгілеу</button>' : ''}
@@ -1582,7 +1613,7 @@ function bindDocActions(root, c, suffix) {
     const node = root.querySelector('[data-act="' + name + '"]');
     if (node) node.onclick = fn;
   };
-  go('confirm' + suffix, () => { modal('full-modal', false); confirmAndSend(id); });
+  go('confirm' + suffix, () => requestSend(id, root));
   go('ikomek' + suffix, () => { modal('full-modal', false); openIkomek(id); });
   go('reject' + suffix, () => { modal('full-modal', false); openReject(id); });
   go('coords', () => copyText(c.lat.toFixed(6) + ', ' + c.lon.toFixed(6), 'Координата көшірілді'));
@@ -1742,42 +1773,90 @@ const CHANNEL_LABEL = {
   telegram: 'Telegram',
 };
 
-async function confirmAndSend(eventId) {
+/* Өтінім қайда кететіні — бір рет сұралып, әр карточкада көрсетіледі.
+   Оператор батырманы баспас БҰРЫН арнаны көруі керек. */
+async function loadDeliveryLabel() {
+  try {
+    const health = await fetch('/api/delivery/health').then((r) => r.json());
+    const ready = Object.entries(health)
+      .filter(([, item]) => item && item.configured)
+      .map(([key]) => CHANNEL_LABEL[key] || key);
+    const ekc = health.ekc109 && health.ekc109.configured;
+    state.deliveryLabel = [
+      ...ready,
+      ...(ekc ? [] : ['iKomek 109 (WhatsApp, бір басу)', 'аудит журналы']),
+    ].join(' · ');
+  } catch (error) {
+    state.deliveryLabel = 'iKomek 109 · аудит журналы';
+  }
+}
+
+/* ============================================================
+   Жіберу — екі қадам, бірақ браузердің confirm() терезесінсіз
+   ------------------------------------------------------------
+   Бірінші басу (немесе Enter) батырманы «Иә, жіберу» күйіне
+   ауыстырады, екіншісі жібереді. Кездейсоқ басудан қорғайды, ал
+   пернетақтамен бір оқиға = Enter, Enter. 6 секундта екінші басу
+   болмаса, батырма бастапқы күйіне оралады.
+   ============================================================ */
+function requestSend(eventId, root) {
   if (!requireAuth()) return;
+  const button = (root || document).querySelector('[data-act^="confirm"]');
+  if (state.armedId === eventId) {
+    clearTimeout(state.armTimer);
+    state.armedId = null;
+    if (button) { button.disabled = true; button.classList.remove('armed'); }
+    modal('full-modal', false);
+    // Оператор серверді КҮТПЕЙДІ: келесі оқиға бірден ашылады, жіберу фонда
+    // жүреді. Координатаның жол сегменті кэште болмаса, сервер OSM-ды
+    // 12 секундқа дейін күтуі мүмкін — ол уақытта оператор келесіні қарайды.
+    advanceQueue(eventId, 'Жіберілуде…', 'ok');
+    doSend(eventId);
+    return;
+  }
+  state.armedId = eventId;
+  if (button) {
+    button.classList.add('armed');
+    const label = button.querySelector('.btn-label');
+    if (label) label.textContent = 'Иә, жіберу — тағы бір рет басыңыз (Enter)';
+  }
+  clearTimeout(state.armTimer);
+  state.armTimer = setTimeout(() => {
+    state.armedId = null;
+    if (button && button.isConnected) {
+      button.classList.remove('armed');
+      const label = button.querySelector('.btn-label');
+      if (label) label.textContent = 'Растау және 109-ға жіберу';
+    }
+  }, 6000);
+}
 
-  // Оператор БАСПАС БҰРЫН өтінімнің қайда кететінін көруі керек
-  const health = await fetch('/api/delivery/health').then((r) => r.json()).catch(() => ({}));
-  const ready = Object.entries(health)
-    .filter(([, s]) => s && s.configured)
-    .map(([key]) => CHANNEL_LABEL[key] || key);
-  const target = health.email?.configured ? `\nАлушы: ${health.email.to}` : '';
-  const where = ready.length
-    ? `${ready.join(', ')}${target}`
-    : 'сыртқы арна бапталмаған — тек аудит журналына жазылады';
-
-  if (!window.confirm(`Оператор деректерді тексерді ме?\n\nӨтінім жіберіледі: ${where}`)) return;
-
+async function doSend(eventId) {
   const response = await fetch(`/api/documents/${encodeURIComponent(eventId)}/confirm`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({}),
   });
   if (!response.ok) {
+    // Кезектен алдын ала алынған оқиғаны қайтарамыз — ол жоғалып кетпеуі керек
     const error = await response.json().catch(() => ({}));
-    return toast(error.detail || 'Өтінім жіберілмеді', 'error');
+    state.dismissed.delete(eventId);
+    state.reviewedCount = Math.max(0, (state.reviewedCount || 1) - 1);
+    loadData().catch(() => {});
+    return toast(`${error.detail || 'Өтінім жіберілмеді'} — оқиға кезекке қайтарылды`, 'error');
   }
   const result = await response.json();
   const delivery = result.delivery || {};
+  const channels = delivery.channels || {};
   const sent = (delivery.delivered || []).map((key) => CHANNEL_LABEL[key] || key);
 
-  // Растау мен 109-ға жүгіну — БІР әрекеттің жалғасы. Оператор екінші
-  // батырманы іздемеуі керек: 109 терезесі өзі ашылады да, мәтіні
-  // дайын тұрады. Жіберу-жібермеу — оның шешімі.
-  if (delivery.ikomek) setTimeout(() => openIkomek(eventId), 400);
-
-  advanceQueue(
-    eventId,
-    sent.length ? `Жіберілді: ${sent.join(', ')}` : `Кезекке қойылды · № ${delivery.ticket_id || ''}`,
+  toast(
+    sent.length ? `Жіберілді: ${sent.join(', ')}` : `Расталды · № ${delivery.ticket_id || ''}`,
     sent.length ? 'ok' : 'warn',
   );
+
+  // Ресми 109 API өтінімді қабылдамаса — iKomek терезесі ӨЗІ ашылады:
+  // мәтін дайын, WhatsApp бір басумен. Бұрын бұл тексеріс жоқ өріске
+  // (delivery.ikomek) қарайтын, сондықтан терезе ешқашан ашылмайтын.
+  if (!(channels.ekc109 && channels.ekc109.ok)) openIkomek(eventId);
 }
 
 /* Жеткізу квитанциясы — өтінім ҚАЙ арнамен кеткені.
@@ -1812,6 +1891,13 @@ function openReject(eventId) {
   state.pendingRejectId = eventId;
   $('reject-note').value = '';
   modal('reject-modal', true);
+}
+
+function quickReject(number) {
+  const select = $('reject-reason');
+  if (!select || number < 1 || number > select.options.length) return;
+  select.selectedIndex = number - 1;
+  submitReject();
 }
 
 async function submitReject() {
@@ -2045,7 +2131,18 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll('#reject-quick [data-n]').forEach((button) => {
+    button.onclick = () => quickReject(Number(button.dataset.n));
+  });
+
   document.addEventListener('keydown', (event) => {
+    // Терезе ашық болса, Esc тек соны жабады: астындағы оқиға карточкасы
+    // ашық қалуы керек — оператор кезекпен жұмысын жалғастырады.
+    if (event.key === 'Escape' && document.querySelector('.modal.open')) {
+      document.querySelectorAll('.modal.open').forEach((item) => item.classList.remove('open'));
+      state.pendingRejectId = null;
+      return;
+    }
     if (event.key === 'Escape') {
       setDrawing(false);
       cancelLocationCorrection();
@@ -2056,6 +2153,20 @@ function bindEvents() {
 
     const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) || event.target.isContentEditable;
     if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    // Ашық терезе өз пернелерін басқарады — кезек пернелері оның астындағы
+    // келесі оқиғаны кездейсоқ жіберіп жібермеуі керек.
+    const openModal = document.querySelector('.modal.open');
+    if (openModal) {
+      if (openModal.id === 'reject-modal' && /^[1-5]$/.test(event.key)) {
+        event.preventDefault();
+        quickReject(Number(event.key));
+      } else if (openModal.id === 'komek-modal' && ['c', 'с'].includes(event.key.toLowerCase())) {
+        event.preventDefault();
+        if (state.komekText) copyText(state.komekText, 'Өтініш мәтіні көшірілді');
+      }
+      return;
+    }
 
     if (event.key === '/') {
       event.preventDefault();
@@ -2087,7 +2198,7 @@ function bindEvents() {
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      confirmAndSend(state.selectedId);
+      requestSend(state.selectedId, $('detail'));
     } else if (event.key === 'x' || event.key === 'ч') {
       event.preventDefault();
       openReject(state.selectedId);
@@ -2108,7 +2219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initMap();
   bindEvents();
   updateOperatorLabel();
-  await Promise.all([loadZones(), loadData()]);
+  await Promise.all([loadZones(), loadData(), loadDeliveryLabel()]);
 
   if (EMBEDDED) {
     const liveSwitch = $('live-switch');
