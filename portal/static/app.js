@@ -102,6 +102,19 @@ function toast(message, kind = '') {
 
 function auth() { return localStorage.getItem('aiqyn_auth'); }
 function authHeaders() { return auth() ? { Authorization: `Basic ${auth()}` } : {}; }
+/* Орыс тілінде сервер берген орысша өрістерді қолданамыз: ақау түрі,
+   өтінім мәтіні, жауапты ұйым. Интерфейстің қалған мәтінін i18n.js аударады. */
+const RU = window.AIQYN_LANG === 'ru';
+function localizeDoc(doc) {
+  if (!RU || !doc) return doc;
+  return {
+    ...doc,
+    defect_type_official: doc.defect_type_official_ru || doc.defect_type_official,
+    description_text: doc.description_text_ru || doc.description_text,
+    responsible_org: doc.responsible_org_ru || doc.responsible_org,
+  };
+}
+
 function isReviewedStatus(status) {
   return !['new', 'candidate', 'rejected', 'duplicate'].includes(status);
 }
@@ -331,6 +344,15 @@ function initMap() {
 
   // Масштаб өзгергенде боялған жол жолағының ені қайта есептеледі —
   // ол әрқашан асфальттың нақты енімен беттесіп тұрады
+  // Учаске атаулары маркерлердің АСТЫНДА тұрады, ал қала масштабында
+  // (14-тен кіші) мүлдем жасырылады: ондаған атау бір-бірін, маркерлерді
+  // және карта тақтасын жауып тастайтын.
+  state.map.createPane('zoneLabels').style.zIndex = 450;
+  state.map.getPane('zoneLabels').style.pointerEvents = 'none';
+  const syncLabelZoom = () => document.querySelector('.map-wrap')
+    .classList.toggle('labels-far', state.map.getZoom() < 14);
+  state.map.on('zoomend', syncLabelZoom);
+  syncLabelZoom();
   state.map.on('zoomend', refreshZoneWeights);
 
   state.map.on('click', async (event) => {
@@ -545,10 +567,13 @@ function renderZones() {
         lineCap: 'round', lineJoin: 'round',
       });
       line.bindPopup(zonePopup(zone, meta, !verified)).addTo(layer);
+      // Алыс масштабта атау жасырын — сызықтың үстіне апарғанда шығады
+      line.bindTooltip(escapeHtml(zone.name), { sticky: true, direction: 'top', className: 'zone-tip' });
 
       const center = line.getCenter ? line.getCenter() : line.getBounds().getCenter();
       L.marker(center, {
         interactive: false,
+        pane: 'zoneLabels',
         icon: L.divIcon({
           className: '',
           html: `<div class="zone-label ${meta.className}">${escapeHtml(zone.name)}</div>`,
@@ -761,7 +786,7 @@ async function openManual(point) {
     try {
       const data = await fetch('/api/categories').then((r) => r.json());
       select.innerHTML = (data.categories || [])
-        .map((item) => `<option value="${attr(item.key)}" data-sev="${attr(item.severity)}">${escapeHtml(item.kk)}</option>`)
+        .map((item) => `<option value="${attr(item.key)}" data-sev="${attr(item.severity)}">${escapeHtml(RU ? (item.ru || item.kk) : item.kk)}</option>`)
         .join('');
       select.onchange = () => {
         const sev = select.selectedOptions[0]?.dataset.sev;
@@ -1273,7 +1298,7 @@ async function loadData() {
     ]);
     if (!documentsResponse.ok || !statsResponse.ok) throw new Error('request');
 
-    state.documents = (await documentsResponse.json()).documents || [];
+    state.documents = ((await documentsResponse.json()).documents || []).map(localizeDoc);
     const stats = await statsResponse.json();
 
     const arrived = state.documents.filter((doc) => !state.knownIds.has(doc.event_id));
@@ -1466,7 +1491,7 @@ async function openDetail(eventId) {
 
   const response = await fetch('/api/documents/' + encodeURIComponent(eventId));
   if (!response.ok) return toast('Оқиға карточкасы жүктелмеді', 'error');
-  const doc = await response.json();
+  const doc = localizeDoc(await response.json());
   state.currentDoc = doc;
 
   const c = docContext(doc);

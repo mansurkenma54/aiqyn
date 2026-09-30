@@ -784,3 +784,8 @@ section { position: relative; padding: var(--aq-sec-y) 0; }
   .rl > span { transform: none; }
   .boot { display: none; }
 }
+
+/* Тіл ауыстырғышы қара хедерде ақ болуы керек */
+.hdr .lang-switch { color: #fff; margin-right: 12px; }
+/* Орысша мәтін қазақшадан ұзынырақ — hero тақырыбы 4 жолға бөлінбеуі үшін */
+html[lang="ru"] .h-hero { font-size: min(clamp(40px, 5.2vw, 76px), 8.8vh); }
