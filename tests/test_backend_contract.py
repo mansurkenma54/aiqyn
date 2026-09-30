@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -56,9 +57,14 @@ class DatabaseContractTests(unittest.TestCase):
         self.db_path = Path(self.tempdir.name) / "aiqyn-test.db"
         self.db_patch = patch.object(db, "DB_PATH", self.db_path)
         self.db_patch.start()
+        # Бос дерекқорға демо суреті автоматты жүктеледі (Vercel үшін).
+        # Тест таза дерекқормен жұмыс істеуі керек — суретті өшіреміз.
+        self.demo_patch = patch.object(db, "DEMO_SNAPSHOT", self.db_path.with_name("no-demo.json"))
+        self.demo_patch.start()
         db.init_db()
 
     def tearDown(self):
+        self.demo_patch.stop()
         self.db_patch.stop()
         self.tempdir.cleanup()
 
@@ -195,15 +201,21 @@ class DatabaseContractTests(unittest.TestCase):
     def test_confirm_approves_sends_and_persists_ticket(self):
         self._insert_document()
         ticket_log = Path(self.tempdir.name) / "tickets.jsonl"
+        # Жеткізу арналары portal/delivery.py ішінде, кілттерді шақыру сәтінде
+        # оқиды. Тест нақты хат/хабар жібермеуі үшін бәрін бос қоямыз.
+        no_channels = {name: "" for name in (
+            "AIQYN_109_URL", "AIQYN_MAIL_PROVIDER", "AIQYN_BREVO_KEY", "AIQYN_RESEND_KEY",
+            "AIQYN_SMTP_HOST", "AIQYN_SMTP_USER", "AIQYN_TELEGRAM_TOKEN",
+            "AIQYN_DELIVERY_WHATSAPP", "AIQYN_WA_TOKEN",
+        )}
         with (
             patch.object(api, "TICKETS_LOG", ticket_log),
-            patch.object(api, "SMTP_HOST", ""),
-            patch.object(api, "SMTP_USER", ""),
+            patch.dict(os.environ, no_channels),
         ):
             result = api.confirm_document("AIQYN-TEST", operator="tester")
 
         self.assertEqual(result["status"], "sent")
-        self.assertTrue(result["delivery"]["ticket_id"].startswith("MOCK-109-"))
+        self.assertTrue(result["delivery"]["ticket_id"].startswith("AIQYN-109-"))
         document = db.get_document("AIQYN-TEST")
         self.assertEqual(document["status"], "sent")
         self.assertEqual(document["external_ticket_id"], result["delivery"]["ticket_id"])

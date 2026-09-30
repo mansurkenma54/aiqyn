@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 import numpy as np
@@ -82,3 +82,60 @@ def merge_overlapping(detections: list[Detection], iou_threshold: float = 0.55) 
             continue
         kept.append(candidate)
     return kept
+
+
+def _gap(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> int:
+    """Екі тіктөртбұрыштың арасындағы ең қысқа қашықтық (пиксель)."""
+    dx = max(0, max(a[0], b[0]) - min(a[2], b[2]))
+    dy = max(0, max(a[1], b[1]) - min(a[3], b[3]))
+    return max(dx, dy)
+
+
+def merge_fragments(
+    detections: list[Detection], max_gap_px: int = 90
+) -> list[Detection]:
+    """Бір ақаудың бөлшектерін БІР ақауға біріктіру.
+
+    МӘСЕЛЕ: асфальттың үлкен қирау аймағын («асфальт беті жоқ жер»)
+    модель тұтас нысан деп танымайды — оны 2-3 бөлек қорап етіп береді.
+    Есепте ол ҮШ ақау болып шығады да, оператор нақты нешеу екенін
+    түсінбейді. Дәлдеу режимінде (кесінділер қабаттасады) бұл әсіресе
+    жиі болады.
+
+    ШЕШІМ: бір санаттағы, бір-біріне жақын тұрған қораптарды бір үлкен
+    қорапқа біріктіреміз. Сенімділік — ең жоғарысы; неше бөлшектен
+    құралғаны `extra["fragments"]` ішінде сақталады.
+    """
+    if len(detections) < 2:
+        return detections
+
+    ordered = sorted(detections, key=lambda d: d.confidence, reverse=True)
+    groups: list[list[Detection]] = []
+
+    for detection in ordered:
+        for group in groups:
+            if group[0].class_key != detection.class_key:
+                continue
+            if any(_gap(detection.bbox, member.bbox) <= max_gap_px for member in group):
+                group.append(detection)
+                break
+        else:
+            groups.append([detection])
+
+    merged: list[Detection] = []
+    for group in groups:
+        if len(group) == 1:
+            merged.append(group[0])
+            continue
+        best = group[0]                      # сенімділігі ең жоғарысы
+        merged.append(
+            replace(
+                best,
+                bbox=(
+                    min(d.bbox[0] for d in group), min(d.bbox[1] for d in group),
+                    max(d.bbox[2] for d in group), max(d.bbox[3] for d in group),
+                ),
+                extra={**best.extra, "fragments": len(group)},
+            )
+        )
+    return merged

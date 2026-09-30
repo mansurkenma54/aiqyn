@@ -87,12 +87,24 @@ class TemporalConfirmer:
     """Детекцияны бірнеше кадрда растайды."""
 
     def __init__(self, need_hits: int = 2, window: int = 6,
-                 iou_threshold: float = 0.20, max_center_gap: float = 2.2):
+                 iou_threshold: float = 0.20, max_center_gap: float = 2.2,
+                 cross_class: bool = True):
         self.need_hits = max(1, need_hits)
         self.window = max(1, window)
         self.iou_threshold = iou_threshold
         # Нысан ортасы өз енінен осынша есе жылжыса да — сол нысан
         self.max_center_gap = max_center_gap
+        # Бір нысанды кластар БОЙЫНША БӨЛМЕУ.
+        #
+        # Модель бір қирау аймағын бір кадрда «торлы жарық», келесісінде
+        # «шұңқыр» деп тануы мүмкін — RDD кластары шын мәнінде шектес.
+        # Класс бойынша қатаң бөлсек, БІР ақау ЕКІ оқиға болып тіркеледі.
+        # Өлшенді (test.MOV): бір қирау 63-кадрда «торлы жарық», 75-кадрда
+        # «шұңқыр» болып екі бөлек құжат ашылатын.
+        #
+        # Сондықтан нысанды ОРНЫ бойынша бақимыз, ал класты трек бойындағы
+        # ЕҢ СЕНІМДІ детекция шешеді.
+        self.cross_class = cross_class
         self._tracks: list[Track] = []
         self._frame = 0
 
@@ -117,7 +129,9 @@ class TemporalConfirmer:
             # өлшем нашар жұмыс істейді, сондықтан екіншісі құтқарады.
             best_index, best_score = None, 0.0
             for index, track in enumerate(self._tracks):
-                if index in matched_tracks or track.class_key != detection.class_key:
+                if index in matched_tracks:
+                    continue
+                if not self.cross_class and track.class_key != detection.class_key:
                     continue
 
                 iou = _iou(track.bbox, detection.bbox)
@@ -151,6 +165,9 @@ class TemporalConfirmer:
             track = self._tracks[best_index]
             matched_tracks.add(best_index)
             track.bbox = detection.bbox
+            if detection.confidence > track.confidence:
+                # Трек бойындағы ЕҢ СЕНІМДІ детекция класты да белгілейді
+                track.class_key = detection.class_key
             track.confidence = max(track.confidence, detection.confidence)
             track.hits += 1
             track.last_seen = self._frame
@@ -162,7 +179,7 @@ class TemporalConfirmer:
                 # Растау сәтіндегі ең жоғары сенімділікті береміз
                 confirmed_now.append(
                     Detection(
-                        class_key=detection.class_key,
+                        class_key=track.class_key,
                         confidence=track.confidence,
                         bbox=detection.bbox,
                         detector=detection.detector,

@@ -8,7 +8,7 @@ echo    AIQYN Portal — оператор сайты
 echo  ============================================
 echo.
 echo    Карта    : http://localhost:8000
-echo    Оператор : admin / aiqyn2026
+echo    Оператор : admin / құпия сөз .env ішінде (AIQYN_ADMIN_PASSWORD)
 echo.
 echo    Тоқтату  : Ctrl+C
 echo  ============================================

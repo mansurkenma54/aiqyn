@@ -706,15 +706,31 @@ def get_document(event_id: str) -> Optional[dict]:
             (event_id,),
         ).fetchall()
         delivery_attempts = connection.execute(
+            # response_json — әр арнаның квитанциясы. Интерфейс өтінімнің
+            # ҚАЙСЫ арнамен кеткенін дәл содан көрсетеді.
             "SELECT ticket_source, ticket_id, delivery_status, mock_109, email, "
-            "email_error, actor, created_at FROM delivery_attempts "
+            "email_error, actor, created_at, response_json FROM delivery_attempts "
             "WHERE event_id = ? ORDER BY id",
             (event_id,),
         ).fetchall()
     document["history"] = [dict(item) for item in history]
     document["location_history"] = [dict(item) for item in location_history]
-    document["delivery_attempts"] = [dict(item) for item in delivery_attempts]
+    document["delivery_attempts"] = [
+        {**dict(item), "channels": _json_or_none(item["response_json"])}
+        for item in delivery_attempts
+    ]
     return document
+
+
+def _json_or_none(raw: object) -> Optional[dict]:
+    """response_json өрісінен арналар квитанциясын алу (бұзық болса — None)."""
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    return data.get("channels") if isinstance(data, dict) else None
 
 
 # ============================================================
@@ -940,3 +956,21 @@ def stats() -> dict:
         "active_zones": len(active_zones),
         "verified_zones": sum(1 for zone in active_zones if zone.get("boundary_verified")),
     }
+
+def status_timestamps() -> dict[str, dict[str, str]]:
+    """Әр оқиға әр кезеңге ҚАШАН жеткені: {event_id: {status: created_at}}.
+
+    Аналитикаға керек: «табылғаннан жөнделгенге дейін қанша уақыт өтті»
+    деген сұрақтың жауабы documents кестесінде жоқ — ол status_history
+    ішінде жатыр. Әр статустың ЕҢ АЛҒАШҚЫ уақыты алынады: оқиға қайта
+    ашылып, екінші рет жөнделсе де, бірінші айналым бұрмаланбайды.
+    """
+    out: dict[str, dict[str, str]] = {}
+    with closing(connect()) as connection:
+        rows = connection.execute(
+            "SELECT event_id, status, MIN(created_at) AS at FROM status_history "
+            "GROUP BY event_id, status"
+        ).fetchall()
+    for row in rows:
+        out.setdefault(row["event_id"], {})[row["status"]] = row["at"]
+    return out

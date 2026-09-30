@@ -13,6 +13,8 @@
 from __future__ import annotations
 
 import logging
+import queue
+import threading
 import time
 from dataclasses import replace
 from typing import Optional
@@ -20,12 +22,11 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from dataclasses import replace
-
 from .aiverify import AIVerifier
 from .config import Config
 from .dedup import Deduplicator
 from .detectors import Detection, DetectorBank, LaneDetector, LaneResult
+from .detectors.confirm import _center_gap
 from .document import build_document, new_event_id
 from .evidence import EvidenceFiles, EvidenceRecorder
 from .geocode import Geocoder
@@ -39,6 +40,177 @@ from .zones import ZoneRegistry
 log = logging.getLogger(__name__)
 
 WINDOW_NAME = "AIQYN Vision"
+
+# Қозғалысты бағалау кішірейтілген сұр кадрда жүреді: 1080p-де optical flow
+# 25 мс алады, ал 480px-де 4 мс. Дәлдігі bbox үшін жеткілікті.
+FLOW_WIDTH = 480
+
+
+class _DetectRequest:
+    __slots__ = ("image", "gray", "ts")
+
+    def __init__(self, image, gray, ts):
+        self.image = image
+        self.gray = gray
+        self.ts = ts
+
+
+class _DetectResult:
+    __slots__ = ("detections", "confirmed", "image", "gray", "ts", "took_ms")
+
+    def __init__(self, detections, confirmed, image, gray, ts, took_ms):
+        self.detections = detections
+        self.confirmed = confirmed
+        self.image = image
+        self.gray = gray
+        self.ts = ts
+        self.took_ms = took_ms
+
+
+# Нысанның ортасы өз енінен осынша есе жылжыса да — сол нысан деп санаймыз
+# (detectors/confirm.py ішіндегі бақылаушымен бірдей шама).
+TRACK_CENTER_GAP = 2.2
+
+# Нысанның ауданы бір қадамда осыншадан артық өссе — бұл сол нысан емес
+AREA_JUMP_LIMIT = 4.0
+
+
+def _evidence_score(confidence: float, area_frac: float) -> float:
+    """«Бұл кадр дәлел фотосына қаншалықты жарайды» бағасы.
+
+    Тек сенімділікпен таңдасақ, ақау АЛҒАШ көрінген — ең алыс, кадрда
+    бірнеше пиксель болатын — кадр құжатқа түсіп қалады. Оператор да,
+    жауапты орган да онда ештеңе көрмейді.
+
+    Сондықтан ақаудың кадрдағы ӨЛШЕМІН де есепке аламыз: көлік жақындаған
+    сайын ақау үлкейеді, ал үлкен әрі сенімді кадр — ең жақсы дәлел.
+    Коэффициент шектеулі (ең көбі 2 есе), сондықтан анық емес, бірақ
+    үлкен нысан жоғары сенімділікті ешқашан жеңіп кетпейді.
+    """
+    size_gain = 1.0 + min(1.0, max(0.0, area_frac) / 0.02)
+    return float(confidence) * size_gain
+
+
+class DetectWorker:
+    """YOLO-ны БӨЛЕК АҒЫНДА жүргізетін қабат.
+
+    Неге керек: CPU-да бір кадрды талдау ~350 мс алады. Егер оны негізгі
+    циклде жасасақ, видео сол жылдамдықпен — секундына 3-7 кадр — ойналады,
+    яғни көрініс «баяу түсірілім» сияқты болады.
+
+    Бұл жерде негізгі цикл кадрды ОҚИДЫ және ЭКРАНҒА ШЫҒАРАДЫ (30 кадр/сек),
+    ал талдау фонда өз қарқынымен жүреді. Талдаушы бос болмаса, кадр жай
+    ғана өткізіп жіберіледі — кезекке жиналмайды, сондықтан көрініс ешқашан
+    артта қалмайды.
+    """
+
+    def __init__(self, bank, min_interval_sec: float = 0.0):
+        self._bank = bank
+        self._min_interval = max(0.0, min_interval_sec)
+        self._requests: queue.Queue = queue.Queue(maxsize=1)
+        self._results: queue.Queue = queue.Queue()
+        self._stop = threading.Event()
+        self._busy = threading.Event()
+        self._last_submit = 0.0
+        self._thread: Optional[threading.Thread] = None
+        self.processed = 0
+        self.last_took_ms = 0.0
+
+    def start(self) -> None:
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, name="aiqyn-detect", daemon=True)
+        self._thread.start()
+
+    def submit(self, image: np.ndarray, gray: np.ndarray, ts: float,
+               wait: bool = False, timeout: float = 10.0) -> bool:
+        """Талдауға кадр беру. Талдаушы бос емес болса — False.
+
+        wait=True — талдаушы босағанша КҮТЕМІЗ (кадр тасталмайды). Бұл тек
+        видеофайл үшін: файлда «нақты уақыттан қалып қою» деген ұғым жоқ,
+        сондықтан бір де бір кадрды жіберіп алудың қажеті жоқ.
+        """
+        if self._stop.is_set():
+            return False
+        if self._busy.is_set():
+            if not wait:
+                return False
+            deadline = time.time() + max(0.0, timeout)
+            while self._busy.is_set() and not self._stop.is_set():
+                if time.time() > deadline:
+                    return False
+                time.sleep(0.002)
+            if self._stop.is_set():
+                return False
+        now = time.time()
+        if self._min_interval and now - self._last_submit < self._min_interval:
+            if not wait:
+                return False
+            time.sleep(self._min_interval - (now - self._last_submit))
+            now = time.time()
+        try:
+            self._requests.put_nowait(_DetectRequest(image, gray, ts))
+        except queue.Full:
+            return False
+        self._busy.set()
+        self._last_submit = now
+        return True
+
+    def poll(self) -> Optional[_DetectResult]:
+        try:
+            return self._results.get_nowait()
+        except queue.Empty:
+            return None
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                request = self._requests.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            started = time.time()
+            try:
+                detections, _lane, context = self._bank.process(request.image)
+                confirmed = context.get("confirmed", detections)
+            except Exception as exc:                       # noqa: BLE001
+                log.error("Талдау қатесі: %s", exc)
+                detections, confirmed = [], []
+            took = (time.time() - started) * 1000
+            self.last_took_ms = took
+            self.processed += 1
+            self._results.put(
+                _DetectResult(detections, confirmed, request.image,
+                              request.gray, request.ts, took)
+            )
+            self._busy.clear()
+
+    def drain(self, handler, timeout: float = 15.0) -> int:
+        """Кезекте қалған нәтижелерді өңдеп бітіру.
+
+        Видео аяқталғанда талдаушының қолында әлі 1-2 кадр болуы мүмкін.
+        Оларды тастап кетсек, видеоның ЕҢ СОҢЫНДАҒЫ ақау есепке ілікпей
+        қалады — қысқа демо-видеода бұл байқалады.
+        """
+        deadline = time.time() + max(0.0, timeout)
+        handled = 0
+        while time.time() < deadline:
+            result = self.poll()
+            if result is not None:
+                try:
+                    handler(result)
+                    handled += 1
+                except Exception as exc:                   # noqa: BLE001
+                    log.error("Соңғы кадрды өңдеу қатесі: %s", exc)
+                continue
+            if not self._busy.is_set():
+                break
+            time.sleep(0.01)
+        return handled
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._busy.clear()
+        if self._thread is not None:
+            self._thread.join(timeout=3.0)
 
 
 class VisionPipeline:
@@ -61,6 +233,11 @@ class VisionPipeline:
             annotator=self._annotate_evidence,
         )
 
+        # Дәлелі әлі жиналып жатқан оқиғалар: {event_id: {class_key, bbox}}.
+        # Солардың анығырақ кадрын тауып, құжаттағы фотоны жаңартамыз.
+        self._open_events: dict[str, dict] = {}
+        self._open_lock = threading.Lock()
+
         self._evidence_hud = Hud(cfg)
         self._evidence_hud.show_debug = False
         self._evidence_hud.show_captions = True
@@ -72,17 +249,57 @@ class VisionPipeline:
         self.documents_built = 0
         self.skipped_in_zone = 0
         self.ai_rejected = 0
+        self.skipped_too_small = 0
         self._fps = 0.0
         self._last_frame_ts = 0.0
         self._portal_online = False
         self._portal_checked_at = 0.0
         self._running = False
 
-        # Графикалық қолданба үшін ілмектер (консольде қолданылмайды):
-        #   frame_callback(canvas, stats) — әр кадрды сыртқа береді
-        #   event_callback(document)      — құжат дайын болғанда шақырылады
+        self._detect_fps = 0.0
+        self._progress = 0.0
+        self._paused = False
+
+        # Графикалық қолданба үшін ілмектер (консольде қолданылмайды).
+        # Кадр ШИКІ күйінде беріледі — қабатты қолданба өзі, кішірейтілген
+        # кадрға салады (әлдеқайда жылдам).
+        #   frame_callback(image, detections, stats) — әр кадр
+        #   detect_callback(detections, image)       — жаңа талдау нәтижесі
+        #   event_started_callback(event_id, det, thumb) — ақау тіркелді
+        #   event_dropped_callback(event_id, reason) — құжат ҚҰРЫЛМАДЫ
+        #   event_callback(document, files)          — құжат дайын
         self.frame_callback = None
+        self.detect_callback = None
+        self.event_started_callback = None
+        self.event_dropped_callback = None
         self.event_callback = None
+
+    def _notify_dropped(self, event_id: str, reason: str) -> None:
+        """Оқиға құжатқа айналмағанын қолданбаға хабарлау.
+
+        Мұнсыз тізімдегі жазба «дәлел жазылуда» күйінде мәңгі қалып,
+        оператор неге құжат шықпағанын түсінбейді.
+        """
+        if self.event_dropped_callback is None:
+            return
+        try:
+            self.event_dropped_callback(event_id, reason)
+        except Exception as exc:
+            log.debug("Оқиға жойылу callback қатесі: %s", exc)
+
+    # --------------------------------------------------------- басқару ---
+
+    def set_paused(self, value: bool) -> None:
+        self._paused = bool(value)
+
+    @property
+    def is_paused(self) -> bool:
+        return self._paused
+
+    @property
+    def progress(self) -> float:
+        """Видеофайлдың қаралған үлесі (0..1). Тірі ағында әрқашан 0."""
+        return self._progress
 
     def request_stop(self) -> None:
         """Циклді сырттан тоқтату (қолданбадағы «Тоқтату» түймесі)."""
@@ -145,6 +362,123 @@ class VisionPipeline:
         )
 
     # ============================================================
+    #  Шешім ізі (аудит)
+    # ============================================================
+
+    def _write_verdict(self, files: "EvidenceFiles", meta: dict,
+                       verdict, decision: str, reason: str) -> None:
+        """Әр ҮМІТКЕР бойынша толық шешім ізін жазу.
+
+        Тек тіркелгендер емес, тіркелМЕГЕНдер де жазылады: оператор да,
+        әзірлеуші де «неге бұл құжат ашылмады?» деген сұраққа жауап таба
+        алуы керек. Көрсетілім видеосы да осы файлдардан құрылады —
+        ойдан шығарылған сан жоқ.
+        """
+        try:
+            import json as _json
+            payload = {
+                "event_id": files.event_id,
+                "class_key": meta.get("class_key"),
+                "yolo_confidence": meta.get("confidence"),
+                "area_frac": meta.get("area_frac"),
+                "bbox": (meta.get("extra") or {}).get("bbox"),
+                "frame_shape": list(meta.get("frame_shape") or []),
+                "min_area_frac": self.cfg.min_event_area_frac,
+                "detected_at": meta.get("detected_at"),
+                "decision": decision,                # registered | too_small | ai_rejected
+                "reason": reason,
+                "ai": verdict.as_dict() if verdict else None,
+                "ai_votes": (verdict.raw or {}).get("votes") if verdict else None,
+                "ai_vote_summary": (verdict.raw or {}).get("vote_summary") if verdict else None,
+                "photo": files.photo.name,
+            }
+            files.photo.with_suffix(".verdict.json").write_text(
+                _json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as exc:                       # noqa: BLE001
+            log.debug("Шешім ізі жазылмады: %s", exc)
+
+    # ============================================================
+    #  Дәлел фотосын жақсарту
+    # ============================================================
+
+    def _handle_result(self, result) -> None:
+        """Талдау нәтижесін толық өңдеу: жаңа ақау + дәлел фотосын жақсарту."""
+        self._handle_detections(result.confirmed, result.image, result.ts)
+        self._improve_evidence(result.detections, result.image, result.ts)
+
+    def _improve_evidence(self, detections: list[Detection], image: np.ndarray,
+                          image_ts: float) -> None:
+        """Жазылып жатқан оқиғаның анығырақ кадрын іздеу.
+
+        Уақыт бойынша растау қабаты бір нысанды БІР-АҚ рет қайтарады —
+        сондықтан оқиға ақау алғаш расталған кадрмен ашылады, ал ол кадрда
+        ақау әлі алыс әрі кішкентай. Дәлел клипі жазылып жатқанда сол
+        нысанның кейінгі (жақынырақ, анығырақ) кадрларын көріп отырамыз да,
+        ең жақсысын құжаттың фотосы етіп қоямыз.
+        """
+        if not detections:
+            return
+        with self._open_lock:
+            if not self._open_events:
+                return
+            open_events = list(self._open_events.items())
+
+        now = None
+        for event_id, state in open_events:
+            # Дәлел клипі 5 секунд жазылады, ал ақау кадрда одан әлдеқайда
+            # тез өтіп кетеді. Терезені шектемесек, сол клип жазылып жатқанда
+            # көрінген БАСҚА ақау (сол класты) осы оқиғаға байланып қалады да,
+            # құжатқа жат фото түседі. Өлшенді: ұсақ таңбаның құжатына 50
+            # кадрдан кейінгі үлкен шұңқырдың фотосы түсіп кеткен.
+            if now is None:
+                now = image_ts
+            if now - state.get("opened_at", now) > self.cfg.evidence_improve_sec:
+                continue
+
+            best = None
+            best_score = -1.0
+            for detection in detections:
+                if detection.class_key != state["class_key"]:
+                    continue
+                # Сол нысан ба? Ортасының жылжуын өз өлшемімен салыстырамыз
+                # (жақындаған сайын нысан жылдам жылжиды әрі үлкейеді,
+                # сондықтан қабаттасу жарамайды).
+                if _center_gap(state["bbox"], detection.bbox) > TRACK_CENTER_GAP:
+                    continue
+                # Нысан бір қадамда бірнеше есе үлкейіп кете алмайды —
+                # ондай «секіру» басқа нысанға ауысып кеткенді білдіреді.
+                if detection.area > state.get("area", 1) * AREA_JUMP_LIMIT:
+                    continue
+                score = _evidence_score(
+                    detection.confidence, detection.area_frac(image.shape)
+                )
+                if score > best_score:
+                    best, best_score = detection, score
+
+            if best is None:
+                continue
+
+            updated = self.recorder.update_best(
+                event_id, image.copy(), best_score,
+                meta_patch={
+                    "confidence": best.confidence,
+                    "area_frac": best.area_frac(image.shape),
+                    "frame_shape": image.shape,
+                    "extra": {"bbox": list(best.bbox)},
+                },
+            )
+            with self._open_lock:
+                if event_id in self._open_events:
+                    # Жақсарса да, жақсармаса да нысанның жаңа орны мен
+                    # өлшемін есте сақтаймыз — әйтпесе ол кадрда жылжып
+                    # кетіп, байланыс үзіледі.
+                    self._open_events[event_id]["bbox"] = tuple(best.bbox)
+                    self._open_events[event_id]["area"] = max(1, best.area)
+            if updated:
+                log.debug("Дәлел фотосы жаңарды: %s (%.0f%%)",
+                          event_id, best.confidence * 100)
+
+    # ============================================================
     #  Оқиға -> құжат  (дәлел дайын болғанда шақырылады)
     # ============================================================
 
@@ -154,6 +488,9 @@ class VisionPipeline:
         Бұл БӨЛЕК АҒЫНДА орындалады, сондықтан мекенжайды анықтау
         (интернет сұрауы, ~1 сек) негізгі циклді тежемейді.
         """
+        with self._open_lock:
+            self._open_events.pop(files.event_id, None)
+
         try:
             fix: GpsFix = meta["fix"]
 
@@ -175,6 +512,8 @@ class VisionPipeline:
                         "Жолға түсіргеннен кейін «%s» аймағына түсті — құжат құрылмады: %s",
                         zone.name, files.event_id,
                     )
+                    self._notify_dropped(
+                        files.event_id, f"«{zone.name}» жөндеу аймағы")
                     return
 
             # Мекенжайды алдымен анықтаймыз — ИИ сарапшысына орынды да
@@ -185,12 +524,23 @@ class VisionPipeline:
             # Мұнда шақырылатын себебі: дәлел фотосы дайын, әрі бұл бөлек
             # ағын — негізгі цикл тежелмейді.
             from datetime import datetime as _dt
+
+            # ИИ-ге ӨҢДЕЛМЕГЕН фото беріледі. Белгіленген нұсқада ақаудың
+            # үстінде жартылай мөлдір қызыл бояу бар — ИИ соны көріп,
+            # нағыз шұңқырды «жол бетіндегі дақ» деп жоққа шығаратын.
+            raw_photo = files.photo.with_name(f"{files.photo.stem}_raw.jpg")
+            if not raw_photo.exists():
+                raw_photo = files.photo
+
             verdict = self.verifier.verify(
-                files.photo,
+                raw_photo,
                 meta["class_key"],
                 meta["confidence"],
                 address=address.get("address_text", ""),
                 when=_dt.fromtimestamp(meta["detected_at"]).strftime("%d.%m.%Y %H:%M"),
+                location_hint=self._describe_location(
+                    (meta.get("extra") or {}).get("bbox"), meta.get("frame_shape")
+                ),
             )
 
             if verdict is not None and not verdict.is_real and self.cfg.ai_drop_rejected:
@@ -213,7 +563,53 @@ class VisionPipeline:
                     ),
                     encoding="utf-8",
                 )
+                self._write_verdict(files, meta, verdict, "ai_rejected", verdict.reason)
+                self._notify_dropped(files.event_id, verdict.reason[:120])
                 return
+
+            # --- ӨЛШЕМ СҮЗГІСІ (ИИ-ден КЕЙІН) ---
+            # Екі сатыдан өткен ақау ресми жөндеу тапсырысын ашуға тұра ма?
+            # Өлшем ақау ЕҢ ЖАҚЫН көрінген кадр бойынша алынады. Сүзгі ИИ-ден
+            # кейін тұр: журналда әр үміткердің ИИ қорытындысы да қалады,
+            # оператор неге тіркелмегенін көре алады. ИИ жоққа шығарғаны
+            # АЛДЫМЕН есептеледі — әйтпесе қорытындыдағы «ИИ жоққа шығарды»
+            # саны ұсақ әрі жалған ақауларды жоғалтып, 0 көрсететін.
+            area_frac = float(meta.get("area_frac") or 0.0)
+            if self.cfg.min_event_area_frac > 0 and area_frac < self.cfg.min_event_area_frac:
+                self.skipped_too_small += 1
+                log.info(
+                    "Ұсақ ақау — құжат ашылмады: %s (%s, кадрдың %.2f%%-ы, шек %.2f%%)",
+                    files.event_id, meta.get("class_key"),
+                    area_frac * 100, self.cfg.min_event_area_frac * 100,
+                )
+                self._write_verdict(
+                    files, meta, verdict, "too_small",
+                    f"кадрдың {area_frac * 100:.2f}%-ы — тіркеу шегінен "
+                    f"({self.cfg.min_event_area_frac * 100:.2f}%) төмен",
+                )
+                self._notify_dropped(files.event_id, "ұсақ ақау — тіркеу шегінен төмен")
+                return
+
+            # --- ЖӨНДЕУ УЧАСКЕСІ БОЙЫНША ТОПТАСТЫРУ ---
+            # Осы жерде ақау барлық сүзгіден өтті: өлшемі де, ИИ де расталды.
+            # Енді ғана «бұл жаңа жұмыс тапсырысы ма, әлде жақын маңдағы
+            # тапсырысқа қосыла ма?» деген сұрақты шешеміз.
+            if not self.dedup.check(meta["class_key"], fix.lat, fix.lon,
+                                    trusted=bool(fix.trusted),
+                                    ts=meta.get("detected_at")):
+                log.info(
+                    "Жақын маңдағы тапсырысқа қосылды: %s (%s, %.0f м радиус)",
+                    files.event_id, meta["class_key"], self.cfg.dedup_radius_m,
+                )
+                self._write_verdict(
+                    files, meta, verdict, "merged_nearby",
+                    "жақын маңдағы жөндеу тапсырысына қосылды "
+                    "(%.0f м радиус)" % self.cfg.dedup_radius_m,
+                )
+                self._notify_dropped(files.event_id, "жақын тапсырысқа қосылды")
+                return
+            self.dedup.remember(meta["class_key"], fix.lat, fix.lon, files.event_id,
+                                ts=meta.get("detected_at"))
 
             document = build_document(
                 cfg=self.cfg,
@@ -255,6 +651,11 @@ class VisionPipeline:
                 document["confidence"] * 100,
             )
 
+            self._write_verdict(
+                files, meta, verdict, "registered",
+                "барлық сатыдан өтті — ресми құжат ашылды",
+            )
+
             self.sender.send(document, files.photo, files.video)
 
             if self.event_callback is not None:
@@ -265,6 +666,7 @@ class VisionPipeline:
 
         except Exception as exc:
             log.exception("Құжат құрастыру сәтсіз (%s): %s", files.event_id, exc)
+            self._notify_dropped(files.event_id, f"қате: {exc}")
 
     # ============================================================
     #  Детекцияны оқиғаға айналдыру
@@ -303,25 +705,28 @@ class VisionPipeline:
         for detection in detections:
             self.detections_total += 1
 
-            if not self.dedup.check(detection.class_key, fix.lat, fix.lon):
-                continue
-
+            # Орын бойынша топтастыру МҰНДА ЕМЕС, құжат сатысында жүреді.
+            #
+            # Неге: бұл жерде ақаудың нақты өлшемі әлі белгісіз (ол дәлел
+            # жиналып біткенде ғана анықталады). Егер топтастыруды осында
+            # жасасақ, ұсақ жалған детекция орынды «иеленіп» алады да,
+            # сол жердегі ШЫН ақауға құжат ашылмай қалады.
             event_id = new_event_id()
-            self.dedup.remember(detection.class_key, fix.lat, fix.lon, event_id)
 
             # Bbox дәл осы stream кадрында табылды. Кейін алынатын /shot.jpg
             # басқа уақыт/FOV болуы мүмкін, сондықтан ресми белгіленген фотоға
             # детекциямен пиксель-пиксель сәйкес кадрды ғана береміз.
             best_image = image.copy()
 
+            area_frac = detection.area_frac(image.shape)
             self.recorder.start_event(
                 event_id=event_id,
                 best_image=best_image,
-                confidence=detection.confidence,
+                score=_evidence_score(detection.confidence, area_frac),
                 meta={
                     "class_key": detection.class_key,
                     "confidence": detection.confidence,
-                    "area_frac": detection.area_frac(image.shape),
+                    "area_frac": area_frac,
                     "fix": fix,
                     "detected_at": real_ts,
                     "detector": detection.detector,
@@ -334,11 +739,78 @@ class VisionPipeline:
                 },
             )
 
+            # Дәлел жиналып жатқанда сол ақаудың анығырақ кадрын іздейміз
+            with self._open_lock:
+                self._open_events[event_id] = {
+                    "class_key": detection.class_key,
+                    "bbox": tuple(detection.bbox),
+                    "area": max(1, detection.area),
+                    "opened_at": real_ts,
+                }
+
             log.info(
                 "АҚАУ ТАБЫЛДЫ: %s (%.0f%%) @ %.5f, %.5f [%s] -> %s",
                 detection.class_key, detection.confidence * 100,
                 fix.lat, fix.lon, fix.source, event_id,
             )
+
+            # Қолданбаға ДЕРЕУ хабарлаймыз. Толық құжат ~10-15 секундтан
+            # кейін дайын болады (дәлел клипі + мекенжай + ИИ тексеруі),
+            # ал оператор ақау табылғанын сол сәтте көруі керек.
+            if self.event_started_callback is not None:
+                try:
+                    self.event_started_callback(
+                        event_id, detection, self._thumbnail(image, detection.bbox)
+                    )
+                except Exception as exc:
+                    log.debug("Оқиға басталу callback қатесі: %s", exc)
+
+    @staticmethod
+    def _describe_location(bbox, frame_shape) -> str:
+        """Ақаудың кадрдағы орнын СӨЗБЕН сипаттау.
+
+        ИИ-ге өңделмеген фото беріледі, сондықтан оған қай жерге қарау
+        керегін айту қажет. Пиксель координатасы емес, адам түсінетін
+        сипаттама беріледі — модель солай дәлірек жұмыс істейді.
+        """
+        if not bbox or not frame_shape:
+            return "кадрдың жол бөлігінде"
+        try:
+            height, width = frame_shape[:2]
+            x1, y1, x2, y2 = bbox
+            cx = (x1 + x2) / 2.0 / max(1, width)
+            cy = (y1 + y2) / 2.0 / max(1, height)
+            horizontal = ("сол жақта" if cx < 0.38
+                          else "оң жақта" if cx > 0.62 else "ортасында")
+            vertical = ("жоғарғы бөлігінде (алыстау)" if cy < 0.55
+                        else "төменгі бөлігінде (жақын)" if cy > 0.78
+                        else "орта бөлігінде")
+            share = (x2 - x1) * (y2 - y1) / float(max(1, width * height)) * 100
+            return (f"кадрдың {horizontal}, {vertical}; "
+                    f"кадр ауданының шамамен {share:.1f}%-ын алып тұр")
+        except Exception:
+            return "кадрдың жол бөлігінде"
+
+    @staticmethod
+    def _thumbnail(image: np.ndarray, bbox, width: int = 112) -> Optional[np.ndarray]:
+        """Тізімде көрсетуге арналған кішкентай кесінді."""
+        try:
+            height, frame_w = image.shape[:2]
+            x1, y1, x2, y2 = bbox
+            pad_x = max(12, (x2 - x1) // 3)
+            pad_y = max(12, (y2 - y1) // 3)
+            x1, y1 = max(0, x1 - pad_x), max(0, y1 - pad_y)
+            x2, y2 = min(frame_w, x2 + pad_x), min(height, y2 + pad_y)
+            if x2 - x1 < 8 or y2 - y1 < 8:
+                return None
+            crop = image[y1:y2, x1:x2]
+            scale = width / float(crop.shape[1])
+            return cv2.resize(
+                crop, (width, max(1, int(crop.shape[0] * scale))),
+                interpolation=cv2.INTER_AREA,
+            )
+        except Exception:
+            return None
 
     # ============================================================
     #  Көмекші
@@ -353,14 +825,30 @@ class VisionPipeline:
         self._last_frame_ts = now
 
     def _check_portal(self, now: float) -> None:
+        """Сайттың күйін ФОНДА тексеру.
+
+        Бұрын ping() негізгі циклде шақырылатын. Сайт өшік тұрса,
+        қосылуды күту 2 СЕКУНДҚА созылып, дәл сол уақытта видео қатып
+        қалатын (өлшенді: 33 мс орнына 2067 мс). Енді тексеру бөлек
+        ағында жүреді — цикл ешқашан тоқтамайды.
+        """
         if now - self._portal_checked_at < 15.0:
             return
         self._portal_checked_at = now
-        self._portal_online = self.sender.ping()
+
+        def probe():
+            try:
+                self._portal_online = self.sender.ping()
+            except Exception:
+                self._portal_online = False
+
+        threading.Thread(target=probe, name="aiqyn-portal-ping", daemon=True).start()
 
     def _stats(self) -> HudStats:
         return HudStats(
             fps=self._fps,
+            detect_fps=self._detect_fps,
+            progress=self._progress,
             detections_total=self.detections_total,
             documents_sent=self.sender.sent_count,
             queued=self.sender.queued_count,
@@ -376,12 +864,19 @@ class VisionPipeline:
         detections: list[Detection],
         previous_gray: Optional[np.ndarray],
         current_gray: Optional[np.ndarray],
+        scale: float = 1.0,
     ) -> list[Detection]:
-        """YOLO аралық кадрларда bbox-ты sparse optical flow арқылы жылжыту.
+        """Талдау аралығындағы кадрларда bbox-ты optical flow арқылы жылжыту.
 
-        Бұрын әр N-ші кадрдағы bbox келесі N-1 қозғалған кадрға сол күйі
-        салынып, метка ақаудан сырғып кететін. Feature жеткіліксіз болса ескі
-        bbox-ты жорамалмен ұстамаймыз — оны бірден жасыру қауіпсіз.
+        Талдау ~350 мс алады, ал осы уақытта көлік жүріп кетеді. Түзетусіз
+        белгі ақаудан артта қалып, жол бетінде «сырғанап» жүрер еді.
+
+        `scale` — сұр кадрлардың түпнұсқаға қатысты өлшемі (0.25 деген —
+        сұр кадр 4 есе кіші). bbox әрқашан ТҮПНҰСҚА координатасында келеді
+        және сол күйінде қайтады.
+
+        Feature жеткіліксіз болса ескі bbox-ты жорамалмен ұстамаймыз —
+        оны бірден жасырған қауіпсіз.
         """
         if (
             not detections
@@ -392,10 +887,11 @@ class VisionPipeline:
             return []
 
         height, width = current_gray.shape[:2]
+        inverse = 1.0 / max(1e-6, scale)
         propagated: list[Detection] = []
 
         for det in detections:
-            x1, y1, x2, y2 = det.bbox
+            x1, y1, x2, y2 = (int(v * scale) for v in det.bbox)
             x1, x2 = max(0, min(width - 1, x1)), max(0, min(width - 1, x2))
             y1, y2 = max(0, min(height - 1, y1)), max(0, min(height - 1, y2))
             if x2 - x1 < 6 or y2 - y1 < 6:
@@ -482,12 +978,29 @@ class VisionPipeline:
             propagated.append(
                 replace(
                     det,
-                    bbox=(nx1, ny1, nx2, ny2),
+                    # Түпнұсқа кадрдың координатасына қайтарамыз
+                    bbox=(
+                        int(round(nx1 * inverse)), int(round(ny1 * inverse)),
+                        int(round(nx2 * inverse)), int(round(ny2 * inverse)),
+                    ),
                     extra={**det.extra, "hud_tracked": True},
                 )
             )
 
         return propagated
+
+    @staticmethod
+    def _flow_gray(image: np.ndarray) -> tuple[np.ndarray, float]:
+        """Optical flow үшін кішірейтілген сұр кадр + оның масштабы."""
+        height, width = image.shape[:2]
+        scale = min(1.0, FLOW_WIDTH / float(max(1, width)))
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        if scale < 1.0:
+            gray = cv2.resize(
+                gray, (int(width * scale), int(height * scale)),
+                interpolation=cv2.INTER_AREA,
+            )
+        return gray, scale
 
     # ============================================================
     #  Негізгі цикл
@@ -531,10 +1044,34 @@ class VisionPipeline:
 
         display_detections: list[Detection] = []
         last_lane: Optional[LaneResult] = None
-        previous_gray: Optional[np.ndarray] = None
+        display_gray: Optional[np.ndarray] = None
+        flow_scale = 1.0
+        detect_times: list[float] = []
         paused = False
         self._running = True
         started_at = time.time()
+
+        # Талдау бөлек ағында жүре ме? Тірі ағында да, файлда да — иә.
+        # Сол арқылы экрандағы көрініс толық жылдамдықпен жүреді.
+        worker: Optional[DetectWorker] = None
+        if self.cfg.async_detect:
+            worker = DetectWorker(
+                self.detectors,
+                min_interval_sec=(1.0 / self.cfg.detect_max_hz)
+                if self.cfg.detect_max_hz > 0 else 0.0,
+            )
+            worker.start()
+            log.info("Талдау бөлек ағында жүреді — видео толық жылдамдықпен ойналады.")
+
+        # Видеофайл — тірі ағын емес: кадр тастаудың мәні жоқ, бәрін талдаймыз.
+        full_scan = bool(
+            worker is not None and not self.source.is_live and self.cfg.file_full_scan
+        )
+        if full_scan:
+            log.info("Толық талдау режимі: видеофайлдың ӘР кадры талданады "
+                     "(бір де бір ақау өткізіп жіберілмейді).")
+
+        total_frames = getattr(self.source, "total_frames", 0) or 0
 
         try:
             while self._running:
@@ -543,9 +1080,11 @@ class VisionPipeline:
                     log.info("Белгіленген уақыт (%.0f сек) аяқталды.", self.cfg.max_duration_sec)
                     break
 
-                if paused:
-                    if self._wait_key() == "quit":
+                if paused or self._paused:
+                    if self.cfg.show_preview and self._wait_key() == "quit":
                         break
+                    if not self.cfg.show_preview:
+                        time.sleep(0.03)
                     continue
 
                 frame = self.source.read()
@@ -558,67 +1097,109 @@ class VisionPipeline:
                 frame.image = self.cfg.crop(frame.image)
 
                 self.frames_seen += 1
+                if total_frames:
+                    self._progress = min(1.0, frame.index / float(total_frames))
                 now = time.time()
                 self._update_fps(now)
                 self._check_portal(now)
 
                 self.recorder.feed(frame.image)
 
-                # Кадрды сыртқа беретін болсақ (графикалық қолданба), превью
-                # логикасының бәрі керек — терезе ашылмаса да
                 wants_canvas = self.cfg.show_preview or self.frame_callback is not None
 
-                current_gray = (
-                    cv2.cvtColor(frame.image, cv2.COLOR_BGR2GRAY)
-                    if wants_canvas else None
-                )
+                if worker is not None:
+                    # ---------- АСИНХРОНДЫ РЕЖИМ ----------
+                    current_gray, flow_scale = self._flow_gray(frame.image)
 
-                # YOLO-ны әр N-ші кадрда жүргіземіз. Аралық кадрда bbox optical
-                # flow-мен қозғалады, ал жеңіл lane detector әр кадрда жаңарады.
-                analyse_now = self.frames_seen % max(1, int(self.cfg.frame_stride)) == 0
-                if analyse_now:
-                    self.frames_analysed += 1
-                    detections, lane, context = self.detectors.process(frame.image)
-                    display_detections, last_lane = detections, lane
-                    # Экранда БАРЛЫҚ детекция көрінеді, ал құжат тек
-                    # бірнеше кадрда РАСТАЛҒАНЫ бойынша құрылады
-                    self._handle_detections(
-                        context.get("confirmed", detections), frame.image, frame.ts
-                    )
-                elif wants_canvas:
-                    display_detections = self._propagate_detections(
-                        display_detections, previous_gray, current_gray
-                    )
-                    lane_detector = self.detectors.lane_detector
-                    if lane_detector is not None:
-                        try:
-                            last_lane = lane_detector.detect(frame.image)
-                        except Exception as exc:
-                            log.debug("Аралық кадрдағы lane қатесі: %s", exc)
+                    # Тірі ағында талдаушы бос болмаса кадр тасталады —
+                    # көрініс артта қалмауы керек. ВИДЕОФАЙЛДА олай емес:
+                    # қалып қоятын «нақты уақыт» жоқ, сондықтан әр кадрды
+                    # талдауға береміз. Өлшенді: 41/126 -> 126/126 кадр,
+                    # 3 -> 6 ақау. Нәтиже әр жүргізуде бірдей болады.
+                    worker.submit(frame.image, current_gray, frame.ts,
+                                  wait=full_scan)
 
-                previous_gray = current_gray
+                    result = worker.poll()
+                    if result is not None:
+                        self.frames_analysed += 1
+                        detect_times.append(result.took_ms)
+                        if len(detect_times) > 30:
+                            detect_times.pop(0)
+                        self._detect_fps = (
+                            1000.0 / (sum(detect_times) / len(detect_times))
+                            if detect_times else 0.0
+                        )
+
+                        self._handle_detections(
+                            result.confirmed, result.image, result.ts
+                        )
+                        # Расталған ақаудың анығырақ кадрын іздейміз:
+                        # растаушы бір нысанды бір рет қана қайтарады,
+                        # ал ЕҢ ЖАҚСЫ кадр әдетте одан кейін келеді.
+                        self._improve_evidence(result.detections, result.image, result.ts)
+
+                        # Нәтиже ЕСКІ кадрға тиесілі — оны ағымдағы кадрға
+                        # жылжытамыз, әйтпесе белгі ақаудан артта қалады
+                        moved = self._propagate_detections(
+                            result.detections, result.gray, current_gray, flow_scale
+                        )
+                        display_detections = moved or result.detections
+
+                        if self.detect_callback is not None and result.detections:
+                            try:
+                                self.detect_callback(result.detections, result.image)
+                            except Exception as exc:
+                                log.debug("Детекция callback қатесі: %s", exc)
+                    else:
+                        display_detections = self._propagate_detections(
+                            display_detections, display_gray, current_gray, flow_scale
+                        )
+
+                    display_gray = current_gray
+                else:
+                    # ---------- ЕСКІ СИНХРОНДЫ РЕЖИМ (тек --sync) ----------
+                    current_gray, flow_scale = (
+                        self._flow_gray(frame.image) if wants_canvas else (None, 1.0)
+                    )
+                    analyse_now = self.frames_seen % max(1, int(self.cfg.frame_stride)) == 0
+                    if analyse_now:
+                        self.frames_analysed += 1
+                        detections, lane, context = self.detectors.process(frame.image)
+                        display_detections, last_lane = detections, lane
+                        self._handle_detections(
+                            context.get("confirmed", detections), frame.image, frame.ts
+                        )
+                        self._improve_evidence(detections, frame.image, frame.ts)
+                    elif wants_canvas:
+                        display_detections = self._propagate_detections(
+                            display_detections, display_gray, current_gray, flow_scale
+                        )
+                    display_gray = current_gray
 
                 if wants_canvas:
-                    latency = self.cfg.stream_latency_sec if self.source.is_live else 0.0
-                    captured_at = frame.ts - latency
-                    display_fix = self.gps.fix_at(captured_at) or self.gps.latest
-                    canvas = self.hud.render(
-                        frame.image,
-                        display_detections,
-                        last_lane,
-                        display_fix,
-                        self._stats(),
-                        captured_at=captured_at,
-                    )
-
-                    # Графикалық қолданбаға кадрды береміз
+                    # Қолданбаға ШИКІ кадр беріледі: қабат кішірейтілген
+                    # көрініске салынады, сондықтан 1080p-ді бос жерге
+                    # боямаймыз (кадрына ~10 мс үнемделеді).
                     if self.frame_callback is not None:
                         try:
-                            self.frame_callback(canvas, self._stats())
+                            self.frame_callback(
+                                frame.image, display_detections, self._stats()
+                            )
                         except Exception as exc:
                             log.debug("Кадр callback қатесі: %s", exc)
 
                     if self.cfg.show_preview:
+                        latency = self.cfg.stream_latency_sec if self.source.is_live else 0.0
+                        captured_at = frame.ts - latency
+                        display_fix = self.gps.fix_at(captured_at) or self.gps.latest
+                        canvas = self.hud.render(
+                            frame.image,
+                            display_detections,
+                            last_lane,
+                            display_fix,
+                            self._stats(),
+                            captured_at=captured_at,
+                        )
                         cv2.imshow(WINDOW_NAME,
                                    fit_to_width(canvas, self.cfg.preview_width))
 
@@ -631,6 +1212,11 @@ class VisionPipeline:
         except KeyboardInterrupt:
             log.info("Ctrl+C — тоқтатылуда...")
         finally:
+            # Соңғы кадрлар талдаушының кезегінде қалуы мүмкін — видеоның
+            # ең соңындағы ақау жоғалып кетпеуі үшін оларды өңдеп аламыз.
+            if worker is not None:
+                worker.drain(self._handle_result)
+                worker.stop()
             self.shutdown()
 
     def _wait_key(self) -> Optional[str]:
@@ -686,6 +1272,9 @@ class VisionPipeline:
         if self.verifier.enabled or self.verifier.checked:
             log.info("  ИИ тексерді            : %d", self.verifier.checked)
             log.info("  ИИ жоққа шығарды       : %d (жалған детекция)", self.ai_rejected)
+        if self.skipped_too_small:
+            log.info("  Ұсақ — тіркелмеді      : %d (өлшем шегінен төмен)",
+                     self.skipped_too_small)
         if self.snapper.checked_count:
             log.info("  Жолға түсірілді        : %d / %d координата",
                      self.snapper.snapped_count, self.snapper.checked_count)

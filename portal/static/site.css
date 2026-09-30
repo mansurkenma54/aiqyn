@@ -1,0 +1,791 @@
+/* ============================================================
+   AIQYN ZHOL — сайттың құрылымы, типографикасы және қозғалысы
+   ------------------------------------------------------------
+   Токендер:  tokens.css
+   Өнім тілі: hud.css  (кадр рамкасы, схема, дәлел карточкасы)
+
+   Ұстаным: жылы ақ редакциялық бет. Қара — тек хидер, негізгі
+   түйме және финал блогы. Түс аз, ауа көп, тақырып ірі.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  scroll-padding-top: calc(var(--aq-topbar) + 20px);
+  background: var(--aq-bg);
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--aq-bg);
+  color: var(--aq-text);
+  font-family: var(--aq-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img, video, svg, iframe { display: block; max-width: 100%; }
+img, video { height: auto; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible { outline: 2px solid var(--aq-text); outline-offset: 3px; border-radius: 4px; }
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: absolute; left: 16px; top: -64px; z-index: 999;
+  padding: 12px 20px; border-radius: var(--aq-r-btn);
+  background: var(--aq-black); color: #fff; font-weight: 700;
+  transition: top var(--aq-t-ui) var(--aq-ease);
+}
+.skip-link:focus { top: 16px; }
+
+.wrap { width: 100%; max-width: var(--aq-page); margin: 0 auto; padding: 0 var(--aq-pad); }
+.wrap-narrow { max-width: 1000px; }
+
+/* ============================================================
+   1. Типографика
+   ============================================================ */
+
+h1, h2, h3, .display {
+  margin: 0;
+  font-family: var(--aq-display);
+  font-weight: 800;
+  letter-spacing: -.055em;
+  line-height: 1.02;
+  color: var(--aq-text);
+}
+
+/* Тақырып экран биіктігіне де байланған: 3 жолға сынып, hero-ны
+   экраннан асырып жібермеуі керек */
+.h-hero { font-size: min(clamp(44px, 5.8vw, 84px), 9.4vh); letter-spacing: -.058em; line-height: .98; }
+.h-xl   { font-size: clamp(34px, 4.4vw, 64px); letter-spacing: -.055em; line-height: 1.03; }
+.h-l    { font-size: clamp(28px, 3.2vw, 46px); letter-spacing: -.05em; line-height: 1.06; }
+.h-m    { font-size: clamp(21px, 2vw, 28px); letter-spacing: -.038em; line-height: 1.18; font-weight: 750; }
+.h-s    { font-size: 18px; letter-spacing: -.028em; line-height: 1.3; font-weight: 750; }
+
+/* Тақырыптың екінші жолы — сөнгіш реңк, референстегідей екпін */
+h1 em, h2 em, .display em { font-style: normal; color: var(--aq-muted); }
+
+.lead {
+  margin: 0; max-width: 56ch;
+  font-size: clamp(17px, 1.2vw, 19px); line-height: 1.65; color: var(--aq-muted);
+}
+.body {
+  margin: 0; max-width: 62ch;
+  font-size: 15.5px; line-height: 1.62; color: var(--aq-muted);
+}
+.body strong, .lead strong { color: var(--aq-text); font-weight: 640; }
+
+/* Eyebrow — ақ таблетка */
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 8px 14px; border-radius: 100px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  font: 800 11px/1 var(--aq-sans); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--aq-muted);
+}
+.eyebrow .dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--aq-red-mid);
+  box-shadow: 0 0 0 3px rgba(227, 71, 37, .16);
+  animation: livePulse 2.4s var(--aq-ease) infinite;
+}
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Бөлім нөмірі */
+.sec-index {
+  display: flex; align-items: center; gap: 14px; margin-bottom: var(--aq-s5);
+  font: 700 11px/1 var(--aq-mono); letter-spacing: .18em; text-transform: uppercase;
+  color: var(--aq-soft);
+}
+.sec-index b { color: var(--aq-text); font-weight: 700; }
+.sec-index::after { content: ""; flex: 1; height: 1px; background: var(--aq-border); max-width: 120px; }
+
+/* Ені px-пен: `ch` 16px мәтінмен есептеледі, сондықтан 64px тақырып
+   ~400px-ке сығылып, 5 жолға бөлінетін. Жол бөлінісін <br> басқарады,
+   ал мәтіннің енін .lead-тің өз max-width-і (56ch) ұстайды. */
+.sec-head { max-width: 720px; margin-bottom: clamp(32px, 4vw, 60px); }
+.sec-head--wide { max-width: 880px; }
+.sec-head .lead { margin-top: var(--aq-s5); }
+
+/* ============================================================
+   2. Шындық белгілері
+   ============================================================ */
+
+.tag {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border-radius: 100px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  font: 800 10.5px/1.3 var(--aq-sans); letter-spacing: .12em; text-transform: uppercase;
+  white-space: nowrap; color: var(--aq-muted);
+}
+.tag::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.tag--verified { color: var(--aq-green); background: var(--aq-green-soft); border-color: transparent; }
+.tag--measured { color: var(--aq-teal);  background: var(--aq-teal-soft);  border-color: transparent; }
+.tag--demo     { color: var(--aq-amber); background: var(--aq-amber-soft); border-color: transparent; }
+.tag--proto    { color: var(--aq-amber); border-style: dashed; border-color: currentColor; background: transparent; }
+.tag--roadmap  { color: var(--aq-soft);  border-style: dashed; background: transparent; }
+
+.on-black .tag { background: rgba(255, 255, 255, .07); border-color: var(--aq-hair-2); color: var(--aq-on-black-2); }
+.on-black .tag--verified { color: var(--aq-green-lit); }
+.on-black .tag--measured { color: var(--aq-teal-lit); }
+.on-black .tag--demo, .on-black .tag--proto { color: var(--aq-amber-lit); }
+
+.src {
+  display: block; margin-top: var(--aq-s3);
+  font: 400 11.5px/1.5 var(--aq-mono); color: var(--aq-soft);
+}
+.on-black .src { color: var(--aq-on-black-2); }
+
+/* ============================================================
+   3. Түймелер
+   ============================================================ */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  height: var(--aq-tap); padding: 0 20px;
+  border: 1px solid transparent; border-radius: var(--aq-r-btn);
+  font: 750 14.5px/1 var(--aq-sans); letter-spacing: -.01em; cursor: pointer;
+  transition: background var(--aq-t-micro) var(--aq-ease),
+              border-color var(--aq-t-micro) var(--aq-ease),
+              color var(--aq-t-micro) var(--aq-ease),
+              box-shadow var(--aq-t-micro) var(--aq-ease),
+              transform var(--aq-t-micro) var(--aq-ease);
+}
+.btn:active { transform: scale(.975); }
+.btn-lg { height: 52px; padding: 0 26px; font-size: 15.5px; }
+
+.btn-primary {
+  background: var(--aq-black); color: #fff; border-color: var(--aq-black);
+  box-shadow: 0 10px 24px rgba(11, 11, 12, .18);
+}
+.btn-primary:hover { background: var(--aq-black-2); box-shadow: 0 14px 30px rgba(11, 11, 12, .24); }
+
+.btn-ghost { background: var(--aq-surface); color: var(--aq-text); border-color: var(--aq-border); }
+.btn-ghost:hover { border-color: var(--aq-border-2); box-shadow: var(--aq-shadow); }
+
+.btn-invert { background: #fff; color: var(--aq-black); }
+.btn-invert:hover { background: #e9e9e6; }
+.btn-hair { border-color: var(--aq-hair-2); color: var(--aq-on-black); }
+.btn-hair:hover { border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .06); }
+
+.btn .ar { transition: transform var(--aq-t-ui) var(--aq-ease); }
+.btn:hover .ar { transform: translateX(4px); }
+
+/* ============================================================
+   4. Жүктелу экраны — БРЕНД КІРІСПЕСІ
+   ------------------------------------------------------------
+   Фоны қара: логотип дәл сол ортада тұрғанда ең әсерлі көрінеді.
+
+   Сюжеті:
+     1. Қара экранда астынан ЖОЛ шығады — асфальт та қара, сондықтан
+        көрінетіні тек ақ жиек сызықтары мен үзік орта сызық. Түнде
+        көлікпен келе жатқандай.
+     2. Жол бүкіл бетті қаптайды, көкжиекте ЖҰЛДЫЗ жанады.
+     3. Бәрі жиналып, ақ таблетка пайда болады — иконка құралды.
+     4. Қызыл REC нүктесі жанады.
+     5. Жанынан «AIqyn zhol» жазуы ашылады.
+   ============================================================ */
+
+.boot {
+  position: fixed; inset: 0; z-index: 2000; overflow: hidden;
+  display: grid; place-content: center; justify-items: center; gap: 30px;
+  /* Логотиптегі асфальтпен ДӘЛ бірдей түс: сонда ірі кезеңде эллипс
+     фонға сіңіп кетеді де, экранда тек ақ жол таңбалары қалады */
+  background: #0b0b0c; color: #fff;
+  transition: opacity 820ms var(--aq-ease), visibility 820ms;
+}
+/* Сөну кезінде мазмұны сәл жақындайды — үзіліс емес, ауысу сезілуі үшін */
+.boot .boot-in { transition: transform 820ms var(--aq-ease), opacity 620ms var(--aq-ease); }
+.boot.gone { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot.gone .boot-in { transform: scale(1.06); opacity: 0; }
+.boot-in { position: relative; display: grid; place-items: center; gap: 22px; }
+
+/* ---- Логотип + жазу: көлденең құлып ---- */
+.boot-lockup { display: flex; align-items: center; }
+
+/* transform-origin — жолдың ТОҒЫСУ нүктесінде (50% 62%): үлкейгенде
+   де, кішірейгенде де көкжиек орнында тұрады, ал жол көрерменге қарай
+   ағады. Дәл осы «жолмен келе жатқан» сезімді береді. */
+.boot-mark {
+  width: clamp(92px, 11.5vw, 128px);
+  transform-origin: 50% 62%;
+  will-change: transform;
+  animation: bootRoad 3400ms both;
+}
+.boot-mark svg { width: 100%; height: auto; }
+
+/* Жол АСТЫНАН шығады: clip-path төменнен жоғары ашылады. Жылжытып
+   көрсетуге болмайды — жол көкжиекте нүктеге дейін жиырылады да,
+   жоғары қарай жылжытсаң, экранға әуелі сол көрінбейтін ұшы кіреді.
+   Ашылу кезінде оның ЕҢ КЕҢ жері бірінші көрінеді. */
+@keyframes bootRoad {
+  0%   { transform: translateY(3vh) scale(14); clip-path: inset(100% 0 0 0);
+         animation-timing-function: cubic-bezier(.22, .68, .3, 1); }
+  /* 1. Жол астынан баяу шығып, бүкіл бетті қаптады (0 → 0.85 с) */
+  25%  { transform: translateY(3vh) scale(14); clip-path: inset(0 0 0 0);
+         animation-timing-function: linear; }
+  /* 2. Көкжиекте жұлдыз жанып тұрған сәт — кадр тұрақ табады (→ 1.7 с) */
+  50%  { transform: translateY(3vh) scale(14); clip-path: inset(0 0 0 0);
+         animation-timing-function: cubic-bezier(.42, .02, .2, 1); }
+  /* 3. Жиналып, иконкаға айналды — ұзақ әрі жұмсақ (1.7 → 3.4 с) */
+  100% { transform: none; clip-path: inset(0 0 0 0); }
+}
+
+/* ---- Логотиптің бөліктері ---- */
+
+/* Ірі кезеңде жол КӨЗДІҢ пішінімен қиылмайды: эллипс көлбеу болғандықтан
+   бір жиегі екіншісінен ұзын шығып, экранда қисық болып көрінер еді.
+   Клип иконка құралар алдында ғана қосылады — сол сәтте жол «көздің
+   ішіне кірді» деген оқылады. */
+.boot:not(.boot--leaving) .lg-road { clip-path: none; }
+.boot.iconized .lg-road { clip-path: url(#lg-eye-boot); }
+
+/* Ақ таблетка соңында ғана пайда болады: ірі кезеңде ол бүкіл бетті
+   ақ қылып жауып тастар еді */
+.boot .lg-badge {
+  transform-box: fill-box; transform-origin: center;
+  opacity: 0; animation: bootBadge 720ms cubic-bezier(.2, .85, .25, 1) 2950ms both;
+}
+@keyframes bootBadge {
+  from { opacity: 0; transform: scale(.84); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Жұлдыз көкжиекте жанады — «айқын» сәті. Жол толық ашылып болғаннан
+   кейін ғана: әйтпесе екеуі бір мезгілде пайда болып, көз шашырайды. */
+.boot .lg-star {
+  transform-box: fill-box; transform-origin: center;
+  opacity: 0; animation: bootStar 1150ms cubic-bezier(.18, .82, .24, 1) 900ms both;
+}
+@keyframes bootStar {
+  from { opacity: 0; transform: scale(.15) rotate(-40deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* REC нүктесі — соңғы қадам: жүйе жазуға кірісті */
+.boot .lg-dot {
+  transform-box: fill-box; transform-origin: center;
+  opacity: 0; animation: bootDot 600ms cubic-bezier(.34, 1.6, .5, 1) 3220ms both;
+}
+@keyframes bootFade { to { opacity: 1; } }
+@keyframes bootDot  { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: none; } }
+
+/* ---- «AIqyn zhol» — құлыптың екінші жартысы ----
+   Ені 0-ден ашылады: логотип сол жаққа ығысады да, жазу «жайылып»
+   шығады. Бұл — брендтің өз құлпы құралып жатқан сәт. */
+.boot-word { overflow: hidden; max-width: 0; }
+.boot-word span {
+  display: block; margin-left: clamp(14px, 1.8vw, 26px); white-space: nowrap;
+  font-family: var(--aq-display); font-size: clamp(30px, 3.8vw, 52px);
+  font-weight: 300; letter-spacing: -.03em; color: #fff;
+  opacity: 0; animation: bootFade 720ms var(--aq-ease) 3400ms forwards;
+}
+.boot-word b { font-weight: 800; }
+.boot-word { animation: bootWord 1050ms cubic-bezier(.2, .8, .2, 1) 3280ms both; }
+@keyframes bootWord { from { max-width: 0; } to { max-width: 52vw; } }
+
+@keyframes bootUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+.boot-sub {
+  font: 500 12px/1 var(--aq-mono); letter-spacing: .16em;
+  color: rgba(255, 255, 255, .55); opacity: 0;
+  animation: bootUp 800ms var(--aq-ease) 3700ms forwards;
+}
+
+/* Бетті ауыстырғанда да сол экран көрсетіледі — бірақ қысқа нұсқада:
+   бет ауысуы жүктелуден ұзақ болмауы керек */
+.boot--leaving { opacity: 0; animation: bootIn 320ms var(--aq-ease) forwards; }
+@keyframes bootIn { to { opacity: 1; } }
+.boot--leaving .boot-mark { animation: bootLeave 620ms var(--aq-ease) both; }
+@keyframes bootLeave {
+  from { transform: translateY(18vh) scale(3.6); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+.boot--leaving .lg-badge, .boot--leaving .lg-edge, .boot--leaving .lg-dash,
+.boot--leaving .lg-star, .boot--leaving .lg-dot {
+  opacity: 1; transform: none; animation: none;
+}
+.boot--leaving .boot-word { max-width: none; animation: none; }
+.boot--leaving .boot-word span { opacity: 1; animation: none; }
+.boot--leaving .boot-in > * { animation: none; opacity: 1; }
+
+/* ============================================================
+   5. Оқу барысы + хидер (қара)
+   ============================================================ */
+
+.scroll-progress {
+  position: fixed; left: 0; top: 0; z-index: 200;
+  height: 3px; width: 0; background: var(--aq-red-mid);
+}
+
+.hdr {
+  position: sticky; top: 0; z-index: 150;
+  background: var(--aq-black);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+.hdr .wrap {
+  display: flex; align-items: center; gap: 26px; height: var(--aq-topbar);
+  transition: height var(--aq-t-ui) var(--aq-ease);
+}
+/* Төмен түскенде хидер жинақталады — бет биіктігін бос алмайды */
+.hdr.compact .wrap { height: 60px; }
+.hdr.compact .brand svg { width: 30px; height: 30px; }
+.hdr .brand svg { transition: width var(--aq-t-ui) var(--aq-ease), height var(--aq-t-ui) var(--aq-ease); }
+
+.brand { display: flex; align-items: center; gap: 13px; min-height: var(--aq-tap); }
+.brand svg { width: 36px; height: 36px; flex: none; border-radius: 10px; }
+/* Құлып: «AI» жуан, «qyn zhol» жіңішке — екеуі бір сөз болып оқылады,
+   бірақ бренд атының ішіндегі AI екпін алады */
+.brand b {
+  font-family: var(--aq-display); font-size: 19px; font-weight: 800;
+  letter-spacing: -.025em; color: #fff;
+}
+.brand b i { font-style: normal; font-weight: 300; color: #fff; }
+
+.nav { display: flex; gap: 2px; margin-left: auto; }
+.nav a {
+  padding: 10px 15px; border-radius: 100px;
+  font-size: 14px; font-weight: 550; color: var(--aq-on-black-2);
+  transition: color var(--aq-t-micro) var(--aq-ease), background var(--aq-t-micro) var(--aq-ease);
+}
+.nav a:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+
+/* ============================================================
+   6. Бөлімдер
+   ============================================================ */
+
+section { position: relative; padding: var(--aq-sec-y) 0; }
+.sec-tight { padding-block: clamp(48px, 5vw, 76px); }
+
+/* ---- Бір бөлім = бір экран ----
+   Мазмұн тік ортада тұрады. Телефонда шектеу алынады: мәтін қысылып
+   қалғаннан гөрі бөлім биігірек болғаны дұрыс. */
+.screen {
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: calc(100svh - var(--aq-topbar));
+  padding-block: clamp(40px, 5.5vh, 96px);
+}
+/* Аласа экранда (ноутбук 720p) тақырып та кішірейеді — бөлім
+   бәрібір бір экранға сыюы керек */
+.screen .h-l  { font-size: min(clamp(30px, 3.4vw, 48px), 6.2vh); }
+.screen .h-xl { font-size: min(clamp(36px, 4.6vw, 64px), 7.4vh); }
+@media (max-width: 900px), (max-height: 620px) {
+  .screen { min-height: 0; padding-block: clamp(56px, 9vw, 88px); }
+}
+/* Бір экранға сыятын бөлімде тақырып блогы ықшамырақ */
+.screen .sec-head { margin-bottom: clamp(24px, 3vh, 40px); }
+.sec-surface { background: var(--aq-surface); }
+.sec-black { background: var(--aq-black); color: var(--aq-on-black); }
+.sec-black h1, .sec-black h2, .sec-black h3 { color: #fff; }
+.sec-black .lead, .sec-black .body { color: var(--aq-on-black-2); }
+.sec-black em { color: var(--aq-on-black-2); }
+.sec-black .sec-index { color: var(--aq-on-black-2); }
+.sec-black .sec-index b { color: #fff; }
+.sec-black .sec-index::after { background: var(--aq-hair-2); }
+.sec-black .eyebrow { background: rgba(255, 255, 255, .07); border-color: var(--aq-hair-2); color: var(--aq-on-black-2); }
+
+/* Бөлімдер арасындағы жіңішке сызық */
+.rule { height: 1px; background: var(--aq-border); }
+
+/* Ақ бөлімдердің фоны мүлдем жалаң болмауы үшін — өте әлсіз рең.
+   Сурет емес, градиент: салмағы нөл. */
+.sec-surface::after, .sec-paper-2::after {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 12% 0%, rgba(227, 71, 37, .035), transparent 70%),
+    radial-gradient(50% 45% at 92% 100%, rgba(0, 168, 180, .04), transparent 70%);
+}
+.sec-surface > .wrap, .sec-paper-2 > .wrap { position: relative; z-index: 1; }
+
+/* ---- Көріну ---- */
+.rv {
+  opacity: 0; transform: translateY(22px);
+  transition: opacity var(--aq-t-reveal) var(--aq-ease),
+              transform var(--aq-t-reveal) var(--aq-ease);
+}
+.rv.on { opacity: 1; transform: none; }
+.d1 { transition-delay: 80ms; }  .d2 { transition-delay: 160ms; }
+.d3 { transition-delay: 240ms; } .d4 { transition-delay: 320ms; }
+.d5 { transition-delay: 400ms; } .d6 { transition-delay: 480ms; }
+
+/* Тақырыпты жол-жолымен шығару: жол маска ішінен көтеріледі */
+.rl { display: block; overflow: hidden; padding-bottom: .08em; }
+.rl > span {
+  display: block; transform: translateY(108%);
+  transition: transform 1100ms var(--aq-ease);
+}
+.on .rl > span, .rl.on > span { transform: none; }
+
+/* ---- Hero кіру реті ----
+   Әр элемент JS арқылы өз кезегімен қосылады (data-seq).
+   .rl-дің өз механизмі бар, сондықтан ол бұған кірмейді. */
+.hero [data-seq]:not(.rl) {
+  opacity: 0; transform: translateY(26px);
+  transition: opacity 900ms var(--aq-ease), transform 900ms var(--aq-ease);
+}
+.hero [data-seq]:not(.rl).on { opacity: 1; transform: none; }
+
+/* ============================================================
+   7. Hero
+   ============================================================ */
+
+.hero { padding-top: clamp(36px, 4.4vh, 68px); padding-bottom: clamp(32px, 4vh, 60px); }
+.hero-grid {
+  display: grid; gap: clamp(30px, 3.4vw, 52px);
+  grid-template-columns: minmax(0, 1.14fr) minmax(0, 1fr);
+  align-items: center;
+}
+@media (max-width: 1040px) { .hero-grid { grid-template-columns: 1fr; } }
+
+.hero .eyebrow { margin-bottom: clamp(16px, 2.4vh, 30px); }
+.hero .h-hero { margin-bottom: clamp(16px, 2.6vh, 30px); }
+.hero .lead { margin-bottom: clamp(20px, 3.2vh, 40px); font-size: clamp(16px, 1.2vw, 18.5px); }
+
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: clamp(18px, 2.6vh, 30px); }
+
+.hero-proof { display: flex; flex-wrap: wrap; gap: 12px 26px; }
+.hero-proof span {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: 13.5px; font-weight: 560; color: var(--aq-muted);
+}
+.hero-proof i {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800;
+  background: var(--aq-green-soft); color: var(--aq-green);
+}
+.hero-proof span.a i { background: var(--aq-red-soft); color: var(--aq-red); }
+.hero-proof span.t i { background: var(--aq-teal-soft); color: var(--aq-teal); }
+
+/* Hero медиасының ені шектеулі — экранды толық алмайды */
+.hero-media { max-width: 620px; margin-left: auto; width: 100%; }
+@media (max-width: 1040px) { .hero-media { margin-inline: auto; } }
+
+/* Кең медиа блоктарының ортақ бағанасы.
+   Ені экранның БИІКТІГІНЕ де байланысты: 16:9 кадр бөлімді бір экраннан
+   асырып жібермеуі керек. */
+.media-col { max-width: min(880px, calc(46svh * 16 / 9)); margin-inline: auto; }
+
+/* ---- Чиптер: қысқа тізім, абзац орнына ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--aq-s5); }
+.chip {
+  display: inline-flex; align-items: center; padding: 9px 16px; border-radius: 100px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  font-size: 14px; font-weight: 600; color: var(--aq-text);
+  transition: border-color var(--aq-t-micro) var(--aq-ease),
+              transform var(--aq-t-micro) var(--aq-ease);
+}
+.chip:hover { border-color: var(--aq-border-2); transform: translateY(-2px); }
+.chip.muted { background: transparent; border-style: dashed; color: var(--aq-soft); font-weight: 500; }
+
+/* ============================================================
+   8. Метрика жолағы
+   ============================================================ */
+
+/* Жиек сызықтары экранның толық енінде, ал сандар — беттің негізгі
+   бағанында (.wrap), басқа бөлімдердің мәтінімен бір тік сызықта. */
+.metrics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  border-block: 1px solid var(--aq-border);
+  padding-inline: max(var(--aq-pad), calc((100% - var(--aq-page)) / 2 + var(--aq-pad)));
+}
+.metrics > div {
+  padding: 28px var(--aq-s5) 30px;
+  border-left: 1px solid var(--aq-border);
+}
+.metrics > div:first-child { border-left: 0; padding-left: 0; }
+/* Телефонда 2×2: бір баған төрт санды екі экранға созып жіберетін */
+@media (max-width: 720px) {
+  .metrics { grid-template-columns: 1fr 1fr; column-gap: var(--aq-s4); }
+  .metrics > div { border-left: 0; border-top: 1px solid var(--aq-border); padding: 20px 0 22px; }
+  .metrics > div:nth-child(-n+2) { border-top: 0; }
+}
+.metrics strong {
+  display: block; margin-bottom: 4px;
+  font-family: var(--aq-display); font-size: clamp(28px, 3vw, 40px); font-weight: 800;
+  letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.metrics > div > span { display: block; font-size: 13.5px; color: var(--aq-muted); }
+/* Дереккөз жолы метрика жолағында да ұсақ моно күйінде қалуы керек */
+.metrics .src { margin-top: var(--aq-s2); font: 400 11.5px/1.45 var(--aq-mono); color: var(--aq-soft); }
+
+/* ============================================================
+   9. Мәлімдеме блогы
+   ============================================================ */
+
+.statement { text-align: center; }
+.statement .h-xl { max-width: 20ch; margin: 0 auto var(--aq-s6); }
+.statement .lead { margin: 0 auto; text-align: center; }
+
+/* ============================================================
+   10. Bento — мүмкіндіктер торы
+   ============================================================ */
+
+.bento {
+  display: grid; gap: var(--aq-s4);
+  grid-template-columns: repeat(6, 1fr);
+}
+.bento > * { grid-column: span 2; }
+.bento .span-3 { grid-column: span 3; }
+.bento .span-4 { grid-column: span 4; }
+.bento .span-6 { grid-column: span 6; }
+@media (max-width: 1040px) {
+  .bento { grid-template-columns: repeat(2, 1fr); }
+  .bento > *, .bento .span-3, .bento .span-4, .bento .span-6 { grid-column: span 2; }
+  .bento .half { grid-column: span 1; }
+}
+@media (max-width: 620px) {
+  .bento { grid-template-columns: 1fr; }
+  .bento > *, .bento .half { grid-column: span 1; }
+}
+
+.tile {
+  display: flex; flex-direction: column; gap: var(--aq-s3);
+  padding: 30px 28px 32px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  border-radius: var(--aq-r-l);
+  transition: border-color var(--aq-t-ui) var(--aq-ease),
+              box-shadow var(--aq-t-ui) var(--aq-ease),
+              transform var(--aq-t-ui) var(--aq-ease);
+}
+.tile:hover { border-color: var(--aq-border-2); box-shadow: var(--aq-shadow); transform: translateY(-3px); }
+.tile .ic {
+  width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+  background: var(--aq-surface-2); color: var(--aq-text);
+  font-family: var(--aq-mono); font-size: 13px; font-weight: 700;
+}
+.tile.red .ic   { background: var(--aq-red-soft); color: var(--aq-red); }
+.tile.teal .ic  { background: var(--aq-teal-soft); color: var(--aq-teal); }
+.tile.amber .ic { background: var(--aq-amber-soft); color: var(--aq-amber); }
+.tile.green .ic { background: var(--aq-green-soft); color: var(--aq-green); }
+.tile .h-s { margin-top: var(--aq-s2); }
+.tile.dark { background: var(--aq-black); border-color: transparent; color: var(--aq-on-black); }
+.tile.dark .h-s { color: #fff; }
+.tile.dark .body { color: var(--aq-on-black-2); }
+.tile.dark .ic { background: rgba(255, 255, 255, .09); color: #fff; }
+.tile.dark:hover { box-shadow: var(--aq-shadow-deep); }
+
+/* ============================================================
+   11. Қадамдар
+   ============================================================ */
+
+/* Алты қадам бір қатарға сыюы керек — екі қатарға бөлінсе бөлім
+   бір экраннан асып кетеді. Артында тізбекті байланыстыратын сызық
+   бар: скроллмен сол сызық сызылып, бойымен нүкте жүгіреді. */
+.steps {
+  position: relative;
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+.steps::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 34px; height: 2px;
+  background: var(--aq-border); z-index: 0;
+}
+.steps::after {
+  content: ""; position: absolute; left: 0; top: 34px; height: 2px; width: 0;
+  background: linear-gradient(90deg, var(--aq-text), var(--aq-red-mid));
+  z-index: 1; transition: width 1.9s var(--aq-ease) 260ms;
+}
+.steps.on::after { width: 100%; }
+@media (max-width: 640px) { .steps::before, .steps::after { display: none; } }
+/* Телефонда екі тар баған мәтінді бір сөзден бөліп тастайды — бір баған */
+@media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+.step { z-index: 2; }
+.step {
+  position: relative; padding: 20px 16px 22px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  border-radius: var(--aq-r-m); overflow: hidden;
+}
+.step .n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 27px; height: 27px; margin-bottom: var(--aq-s3); border-radius: 8px;
+  background: var(--aq-surface-2); color: var(--aq-text);
+  font: 700 11.5px/1 var(--aq-mono);
+}
+.step .h-s { font-size: 15.5px; }
+.step .body { font-size: 13.5px; line-height: 1.5; }
+.step.human .n { background: var(--aq-red-soft); color: var(--aq-red); }
+.step .h-s { margin-bottom: 6px; }
+.step::after {
+  content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 0;
+  background: var(--aq-text); transition: width 800ms var(--aq-ease);
+}
+.step.human::after { background: var(--aq-red-mid); }
+.steps.on .step::after { width: 100%; }
+.steps.on .step:nth-child(2)::after { transition-delay: 110ms; }
+.steps.on .step:nth-child(3)::after { transition-delay: 220ms; }
+.steps.on .step:nth-child(4)::after { transition-delay: 330ms; }
+.steps.on .step:nth-child(5)::after { transition-delay: 440ms; }
+.steps.on .step:nth-child(6)::after { transition-delay: 550ms; }
+
+/* ============================================================
+   12. Тізім
+   ============================================================ */
+
+.facts { list-style: none; margin: var(--aq-s5) 0 0; padding: 0; }
+.facts li {
+  display: grid; grid-template-columns: 26px 1fr; gap: 14px;
+  padding: 15px 0; border-top: 1px solid var(--aq-border);
+  font-size: 15.5px; line-height: 1.5;
+}
+.sec-black .facts li { border-top-color: var(--aq-hair); }
+.facts li:first-child { border-top: 0; padding-top: 0; }
+.facts i {
+  font-style: normal; font: 700 11px/26px var(--aq-mono);
+  color: var(--aq-soft); text-align: right;
+}
+.sec-black .facts i { color: var(--aq-on-black-2); }
+.facts i.warn { color: var(--aq-red); font-size: 15px; }
+
+.split { display: grid; gap: clamp(32px, 4vw, 64px); grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: center; }
+.split--top { align-items: start; }
+
+/* ============================================================
+   13. Кестелер
+   ============================================================ */
+
+.table-wrap {
+  border: 1px solid var(--aq-border); border-radius: var(--aq-r-l);
+  overflow-x: auto; background: var(--aq-surface);
+}
+.spec { width: 100%; border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.spec th, .spec td { padding: 16px 20px; text-align: left; border-bottom: 1px solid var(--aq-border); }
+.spec thead th {
+  font: 800 10.5px/1 var(--aq-sans); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--aq-soft); background: var(--aq-surface-2);
+}
+.spec td:first-child { color: var(--aq-muted); }
+.spec tbody tr:last-child td { border-bottom: 0; }
+.spec tbody tr { transition: background var(--aq-t-micro) var(--aq-ease); }
+.spec tbody tr:hover { background: var(--aq-surface-2); }
+.spec b { font-weight: 700; color: var(--aq-text); }
+.spec .u { font-family: var(--aq-mono); font-weight: 700; color: var(--aq-teal); }
+
+/* ============================================================
+   14. Пилот кезеңдері
+   ============================================================ */
+
+.phases { display: grid; gap: var(--aq-s3); counter-reset: ph; }
+.phase {
+  display: grid; gap: 8px 26px; align-items: start;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  padding: 26px 28px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  border-radius: var(--aq-r-m);
+  transition: border-color var(--aq-t-ui) var(--aq-ease), box-shadow var(--aq-t-ui) var(--aq-ease);
+}
+.phase:hover { border-color: var(--aq-border-2); box-shadow: var(--aq-shadow); }
+.phase::before {
+  counter-increment: ph; content: counter(ph, decimal-leading-zero);
+  grid-row: 1 / span 2;
+  font-family: var(--aq-display); font-size: 26px; font-weight: 800;
+  letter-spacing: -.05em; color: var(--aq-border-2);
+}
+.phase .ph-t { font-family: var(--aq-display); font-size: 19px; font-weight: 750; letter-spacing: -.03em; }
+.phase .ph-d { grid-column: 2; font-size: 15px; line-height: 1.55; color: var(--aq-muted); max-width: 70ch; }
+.phase .tag { grid-row: 1; grid-column: 3; }
+@media (max-width: 760px) {
+  .phase { grid-template-columns: 42px 1fr; }
+  .phase .tag { grid-row: auto; grid-column: 2; justify-self: start; }
+  .phase .ph-d { grid-column: 2; }
+}
+
+/* ============================================================
+   15. Тұрғын формасы
+   ============================================================ */
+
+.report {
+  border: 1px solid var(--aq-border); border-radius: var(--aq-r-l);
+  overflow: hidden; background: var(--aq-surface);
+}
+.report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.report-copy { padding: clamp(30px, 3.6vw, 48px); }
+.report-form { padding: clamp(30px, 3.6vw, 48px); background: var(--aq-surface-2); border-left: 1px solid var(--aq-border); }
+.fld { margin-bottom: var(--aq-s4); }
+.fld label {
+  display: block; margin-bottom: var(--aq-s2);
+  font: 800 10.5px/1 var(--aq-sans); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--aq-soft);
+}
+.fld input, .fld textarea {
+  width: 100%; min-height: var(--aq-tap); padding: 13px 15px;
+  border-radius: var(--aq-r-s);
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  color: var(--aq-text); font: 400 15px/1.45 var(--aq-sans);
+  transition: border-color var(--aq-t-micro) var(--aq-ease), box-shadow var(--aq-t-micro) var(--aq-ease);
+}
+.fld input::placeholder, .fld textarea::placeholder { color: var(--aq-soft); }
+.fld input:focus, .fld textarea:focus {
+  border-color: var(--aq-text); outline: none; box-shadow: 0 0 0 3px rgba(11, 11, 12, .07);
+}
+.fld textarea { resize: vertical; min-height: 84px; }
+.drop {
+  border: 1px dashed var(--aq-border-2); border-radius: var(--aq-r-m);
+  padding: 24px; text-align: center; cursor: pointer; color: var(--aq-muted);
+  background: var(--aq-surface);
+  transition: border-color var(--aq-t-micro) var(--aq-ease), background var(--aq-t-micro) var(--aq-ease);
+}
+.drop:hover, .drop.hot { border-color: var(--aq-text); background: var(--aq-surface-2); }
+.drop b { display: block; margin-bottom: 3px; color: var(--aq-text); font-size: 14.5px; font-weight: 700; }
+.drop small { font-size: 12.5px; color: var(--aq-soft); }
+.drop img { max-height: 130px; margin: 12px auto 0; border-radius: var(--aq-r-s); }
+.form-msg { margin-top: var(--aq-s3); min-height: 20px; font-size: 13.5px; }
+.form-msg.ok  { color: var(--aq-green); }
+.form-msg.err { color: var(--aq-red); }
+
+/* ============================================================
+   16. Финал + футер
+   ============================================================ */
+
+.final { text-align: center; }
+.final .h-xl { max-width: 24ch; text-wrap: balance; margin: 0 auto var(--aq-s6); }
+.final .lead { margin: 0 auto var(--aq-s7); text-align: center; }
+.final .hero-actions { justify-content: center; margin-bottom: 0; }
+
+.foot { background: var(--aq-black); color: var(--aq-on-black-2); border-top: 1px solid var(--aq-hair); }
+.foot .wrap {
+  display: flex; flex-wrap: wrap; gap: 16px 34px; align-items: center;
+  padding-top: var(--aq-s7); padding-bottom: var(--aq-s7);
+  font-size: 13.5px;
+}
+.foot .brand { margin-right: auto; }
+.foot a { color: var(--aq-on-black); border-bottom: 1px solid var(--aq-hair-2); }
+.foot a:hover { border-bottom-color: currentColor; }
+
+/* ============================================================
+   17. Бейімделу
+   ============================================================ */
+
+@media (max-width: 980px) { .nav { display: none; } }
+@media (max-width: 560px) {
+  .hdr .wrap { gap: 12px; }
+  .hero-actions .btn { flex: 1 1 100%; }
+  .btn { padding: 0 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .rv { opacity: 1; transform: none; }
+  .rl > span { transform: none; }
+  .boot { display: none; }
+}
+
+/* Тіл ауыстырғышы қара хедерде ақ болуы керек */
+.hdr .lang-switch { color: #fff; margin-right: 12px; }
+/* Орысша мәтін қазақшадан ұзынырақ — hero тақырыбы 4 жолға бөлінбеуі үшін */
+html[lang="ru"] .h-hero { font-size: min(clamp(40px, 5.2vw, 76px), 8.8vh); }

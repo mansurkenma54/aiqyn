@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <script src="/static/i18n-ru.js"></script>
+  <script src="/static/i18n.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050506">
+  <title>AIQYN — жол инфрақұрылымының аналитикасы</title>
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+  <script>
+    try {
+      var t = localStorage.getItem('aiqyn_theme');
+      if (t) document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <link rel="preload" href="/static/vendor/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/vendor/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/vendor/fonts/mono-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/analytics.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="canonical" href="https://aiqyn-alpha.vercel.app/analytics">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AIQYN">
+  <meta property="og:locale" content="kk_KZ">
+  <meta property="og:title" content="AIQYN — жол инфрақұрылымының аналитикасы">
+  <meta property="og:description" content="Камера жол ақауын өзі табады, дәлелін жинайды және ресми өтінімді дайындайды. Оператор тексеріп, 109-ға жібереді.">
+  <meta property="og:url" content="https://aiqyn-alpha.vercel.app/analytics">
+  <meta property="og:image" content="https://aiqyn-alpha.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="AIQYN — жол ақауын автоматты бақылау">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://aiqyn-alpha.vercel.app/og-image.png">
+</head>
+<body class="an-body">
+
+<header class="topbar">
+  <a class="brand" href="/" aria-label="AIQYN бас беті">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-copy">
+      <strong>AI<em>qyn zhol</em></strong><span>Аналитика</span>
+      <small>Шымкент · жол инфрақұрылымын басқару</small>
+    </span>
+  </a>
+  <div class="topbar-actions" style="margin-left:auto">
+    <!-- Хидер таза: экспорт батырмалары беттің өз бөлімдерінде тұр,
+         үш жерде қайталанудың қажеті жоқ -->
+    <span data-lang-switch></span>
+    <a class="icon-btn has-label" href="/portal"><i class="fa-solid fa-map-location-dot"></i><span>Оператор картасы</span></a>
+  </div>
+</header>
+
+<main class="an-wrap" id="an-root">
+  <div class="an-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Деректер жиналуда…</div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const TYPE_KK = {
+    pothole: 'Шұңқыр',
+    crack_alligator: 'Торлы жарықшақ',
+    crack_transverse: 'Көлденең жарықшақ',
+    crack_longitudinal: 'Бойлық жарықшақ',
+    flood: 'Су басу',
+    streetlight_out: 'Жарықтандыру',
+    obstruction: 'Кедергі',
+  };
+  const STATUS_KK = {
+    new: 'Тексеруді күтуде', candidate: 'Тексеруді күтуде',
+    confirmed: 'Оператор растады', verified: 'Оператор растады',
+    sent: '109-ға жіберілді', submitted: '109-ға жіберілді',
+    in_progress: 'Орындалуда', repaired: 'Қайта тексеру',
+    closed: 'Жабылды', reopened: 'Қайта ашылды', rejected: 'Қабылданбады',
+  };
+  const SEV_KK = { high: 'Жоғары', medium: 'Орташа', low: 'Төмен' };
+  const SEV_COLOR = { high: '#ff453a', medium: '#ffd60a', low: '#0a84ff' };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function bars(items, label, color) {
+    const max = Math.max(...items.map((i) => i.count), 1);
+    return items.map((item, i) => `
+      <div class="an-bar" style="--d:${i * 70}ms">
+        <span class="an-bar-key">${esc(label(item))}</span>
+        <span class="an-bar-track">
+          <i style="--w:${(item.count / max * 100).toFixed(1)}%;--c:${color(item)}"></i>
+        </span>
+        <b>${item.count}</b>
+      </div>`).join('');
+  }
+
+  function donut(items, total) {
+    if (!total) return '';
+    let offset = 0;
+    const R = 52, C = 2 * Math.PI * R;
+    const arcs = items.map((item, i) => {
+      const frac = item.count / total;
+      const seg = `<circle class="an-arc" r="${R}" cx="70" cy="70"
+        stroke="${SEV_COLOR[item.key] || '#8e8e96'}"
+        stroke-dasharray="${(frac * C).toFixed(2)} ${C.toFixed(2)}"
+        stroke-dashoffset="${(-offset * C).toFixed(2)}" style="--d:${i * 140}ms"/>`;
+      offset += frac;
+      return seg;
+    }).join('');
+    return `<svg viewBox="0 0 140 140" class="an-donut">
+      <circle r="52" cx="70" cy="70" class="an-arc-bg"/>${arcs}
+      <text x="70" y="66" class="an-donut-n">${total}</text>
+      <text x="70" y="84" class="an-donut-l">оқиға</text>
+    </svg>`;
+  }
+
+  function spark(days) {
+    if (days.length < 2) return '<p class="an-empty">Динамика үшін дерек жеткіліксіз</p>';
+    const max = Math.max(...days.map((d) => d.count), 1);
+    const W = 100, H = 34;
+    const pts = days.map((d, i) => [
+      (i / (days.length - 1)) * W,
+      H - (d.count / max) * (H - 4) - 2,
+    ]);
+    const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const area = line + ` L${W} ${H} L0 ${H} Z`;
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="an-spark">
+      <path d="${area}" class="an-spark-a"/><path d="${line}" class="an-spark-l"/></svg>
+      <div class="an-spark-x"><span>${esc(days[0].date)}</span><span>${esc(days[days.length - 1].date)}</span></div>`;
+  }
+
+  /* Сағатты адам оқитын түрге келтіру: 0.4 сағ емес, «26 мин». */
+  function dur(hours) {
+    if (hours == null) return '—';
+    if (hours < 1) return Math.round(hours * 60) + ' мин';
+    if (hours < 48) return (Math.round(hours * 10) / 10) + ' сағ';
+    return Math.round(hours / 24) + ' күн';
+  }
+  function pct(value) { return value == null ? '—' : Math.round(value * 100) + '%'; }
+
+  /* Кезеңдер шынжыры: оқиға қай сатыда тұрғанын бір қарағанда көрсетеді. */
+  const STAGE_KK = {
+    new: 'Тексеруде', confirmed: 'Расталды', sent: '109-ға кетті',
+    in_progress: 'Жөндеуде', repaired: 'Жөнделді', closed: 'Жабылды',
+  };
+  function funnel(stages) {
+    const max = Math.max(1, ...stages.map((s) => s.count));
+    return stages.map((s) => `<div class="an-stage">
+      <span class="an-stage-n">${s.count}</span>
+      <span class="an-stage-bar"><i style="width:${(s.count / max) * 100}%"></i></span>
+      <span class="an-stage-k">${esc(STAGE_KK[s.key] || s.key)}</span>
+    </div>`).join('');
+  }
+
+  fetch('/api/analytics').then((r) => r.json()).then((a) => {
+    const q = a.quality || {};
+    const o = a.operations || {};
+    const rate = q.ai_confirm_rate != null ? Math.round(q.ai_confirm_rate * 100) + '%' : '—';
+    document.getElementById('an-root').innerHTML = `
+      <div class="an-head">
+        <div>
+          <p class="eyebrow">Жол инфрақұрылымын басқару</p>
+          <h1>Аналитика және есептілік</h1>
+          <p class="an-sub">Дереккөз — жүйенің өз базасы, қолмен енгізілген сан жоқ.
+            Есеп ${esc((a.generated_at || '').replace('T', ' ').slice(0, 16))} жағдайына жасалды.</p>
+        </div>
+        <div class="an-head-actions">
+          <a class="btn btn-ghost" href="/portal"><i class="fa-solid fa-map-location-dot"></i> Картаға оралу</a>
+          <a class="btn btn-primary" href="/api/export.csv?status=all"><i class="fa-solid fa-file-csv"></i> Толық есеп (CSV)</a>
+        </div>
+      </div>
+
+      <!-- ═══ 1. Қазір не істеу керек ═══ -->
+      <section class="an-sec">
+        <div class="an-sec-head">
+          <span class="an-sec-n">01</span>
+          <div><h2>Ағымдағы жағдай</h2>
+            <p>Бүгін назар аударуды қажет ететін өтінімдер.</p></div>
+        </div>
+        <div class="an-ops-row">
+          <div class="an-ops-cell${o.overdue ? ' hot' : ''}">
+            <span>Ашық өтінім</span><b>${o.open ?? 0}</b>
+            <small>${o.overdue ? o.overdue + ' өтінім ' + o.sla_hours + ' сағаттан асты' : 'мерзімі өткені жоқ'}</small>
+          </div>
+          <div class="an-ops-cell">
+            <span>Барлығы тіркелген</span><b>${a.total}</b>
+            <small>жүйе жұмыс істеген кезеңде</small>
+          </div>
+          <div class="an-ops-cell">
+            <span>Жабылған</span><b>${o.closed ?? 0}</b>
+            <small>${pct(o.closure_rate)}${o.reopened ? ' · ' + o.reopened + ' қайта ашылды' : ''}</small>
+          </div>
+          <div class="an-ops-cell">
+            <span>Картадағы учаске</span><b>${o.active_zones ?? '—'}</b>
+            <small>жол жұмысы және жабық жол</small>
+          </div>
+        </div>
+        ${o.oldest_open ? `<a class="an-oldest" href="/portal?event=${encodeURIComponent(o.oldest_open.event_id)}">
+          <span>Ең ұзақ күтіп тұрған өтінім — ашып қарау</span>
+          <b>${dur(o.oldest_open.hours)}</b>
+          <small>${esc(o.oldest_open.address || o.oldest_open.event_id)}</small></a>` : ''}
+      </section>
+
+      <!-- ═══ 2. Жүйе қалай жұмыс істеп жатыр ═══ -->
+      <section class="an-sec">
+        <div class="an-sec-head">
+          <span class="an-sec-n">02</span>
+          <div><h2>Жұмыс тиімділігі</h2>
+            <p>Ақаудың саны емес, оған қанша уақытта жауап берілгені.
+              Медиана алынған — бір ұзап кеткен оқиға бүкіл суретті бұрмаламауы үшін.</p></div>
+        </div>
+        <div class="an-ops-row">
+          <div class="an-ops-cell">
+            <span>Табылғаннан растауға</span><b>${dur(o.median_to_review_h)}</b>
+            <small>${o.reviewed_count || 0} өтінім бойынша</small>
+          </div>
+          <div class="an-ops-cell">
+            <span>Жіберуден жөндеуге</span><b>${dur(o.median_to_repair_h)}</b>
+            <small>${o.repaired_count ? o.repaired_count + ' өтінім бойынша' : 'әзірге жөнделгені жоқ'}</small>
+          </div>
+          <div class="an-ops-cell">
+            <span>Толық айналым</span><b>${dur(o.median_full_cycle_h)}</b>
+            <small>табылғаннан жабылғанға дейін</small>
+          </div>
+          <div class="an-ops-cell">
+            <span>Жауапты органға жетті</span><b>${o.delivered ?? 0}</b>
+            <small>${pct(o.delivery_rate)}${o.delivery_failed ? ' · ' + o.delivery_failed + ' жетпеді' : ''}</small>
+          </div>
+        </div>
+        <div class="an-card an-card--flat">
+          <h3>Өтінімдер қай кезеңде тұр</h3>
+          <div class="an-stages">${funnel(o.pipeline || [])}</div>
+        </div>
+      </section>
+
+      <!-- ═══ 3. Қай жерде ═══ -->
+      <section class="an-sec">
+        <div class="an-sec-head">
+          <span class="an-sec-n">03</span>
+          <div><h2>Ақау қай жерде жиналған</h2>
+            <p>Жөндеу кезегін осы тізімнің басынан бастаған тиімді.</p></div>
+        </div>
+        <div class="an-card an-card--flat">
+          <div class="an-bars">${bars(a.by_street, (i) => i.street,
+            (i) => (i.high ? '#ff453a' : '#0a84ff'))}</div>
+          <p class="an-note">Қызыл — ішінде ауыр ақауы бар көшелер.</p>
+        </div>
+      </section>
+
+      <!-- ═══ 4. Не табылған ═══ -->
+      <section class="an-sec">
+        <div class="an-sec-head">
+          <span class="an-sec-n">04</span>
+          <div><h2>Не табылған</h2>
+            <p>Ақау түрі жоспарлауға керек: қандай техника мен материал қажет.</p></div>
+        </div>
+        <div class="an-grid">
+          <article class="an-card">
+            <h3>Ақау түрлері</h3>
+            <div class="an-bars">${bars(a.by_type, (i) => TYPE_KK[i.key] || i.key, () => '#ff9f0a')}</div>
+          </article>
+          <article class="an-card">
+            <h3>Қауіп деңгейі</h3>
+            <div class="an-donut-wrap">
+              ${donut(a.by_severity, a.total)}
+              <ul class="an-legend">
+                ${a.by_severity.map((sv) => `<li><i style="background:${SEV_COLOR[sv.key] || '#8e8e96'}"></i>
+                  ${esc(SEV_KK[sv.key] || sv.key)} <b>${sv.count}</b></li>`).join('')}
+              </ul>
+            </div>
+          </article>
+          <article class="an-card an-card--wide">
+            <h3>Тіркелу динамикасы</h3>
+            <p class="an-note">Күн сайын неше ақау тіркелгені — рейс тығыздығын да көрсетеді.</p>
+            ${spark(a.by_day)}
+          </article>
+        </div>
+      </section>
+
+      <!-- ═══ 5. Жүйенің өз сапасы ═══ -->
+      <section class="an-sec">
+        <div class="an-sec-head">
+          <span class="an-sec-n">05</span>
+          <div><h2>Жүйенің сапасы</h2>
+            <p>Модель қаншалық дәл жұмыс істеп тұрғаны — оны да жасырмау керек.</p></div>
+        </div>
+        <div class="an-ops-row">
+          <div class="an-ops-cell"><span>ЖИ тексерген</span><b>${q.ai_checked ?? 0}</b>
+            <small>оқиғаның қорытындысы бар</small></div>
+          <div class="an-ops-cell"><span>ЖИ растау үлесі</span><b>${rate}</b>
+            <small>қалғаны — жалған сигнал</small></div>
+          <div class="an-ops-cell"><span>Орташа сенімділік</span><b>${q.avg_confidence != null ? Math.round(q.avg_confidence * 100) + '%' : '—'}</b>
+            <small>модель шығысы, қауіп бағасы емес</small></div>
+          <div class="an-ops-cell"><span>Оператор орнын нақтылады</span><b>${q.location_corrected ?? 0}</b>
+            <small>GPS дәл болмаған жағдайлар</small></div>
+        </div>
+      </section>
+
+      <!-- ═══ 6. Сыртқы жүйелер ═══ -->
+      <section class="an-sec">
+        <div class="an-sec-head">
+          <span class="an-sec-n">06</span>
+          <div><h2>Сыртқы жүйелерге беру</h2>
+            <p>Кеңістіктік байланыс OpenStreetMap геометриясы арқылы жасалады: әр оқиға
+              нақты жол сегментіне (<code>OSM:way/&lt;id&gt;</code>) байланады.</p></div>
+        </div>
+        <div class="an-card an-card--flat">
+          <div class="an-facts an-facts--row">
+            <div><span>Жол сегментіне байланды</span>
+              <b>${o.spatially_bound ?? 0} <i>/ ${a.total}</i></b>
+              <small>${pct(o.spatial_rate)} · SDR / ЦС ГГ НИПД талабы</small></div>
+          </div>
+          <div class="an-export-row">
+            <a class="btn btn-ghost" href="/api/export/gis.geojson" download>
+              <i class="fa-solid fa-earth-asia"></i> GeoJSON · ЦС ГГ НИПД / ГАЖ</a>
+            <a class="btn btn-ghost" href="/api/export/sdr.json" download>
+              <i class="fa-solid fa-database"></i> SDR оқиға журналы</a>
+            <a class="btn btn-ghost" href="/api/export.csv?status=all">
+              <i class="fa-solid fa-file-csv"></i> CSV кестесі</a>
+          </div>
+        </div>
+      </section>
+
+      <p class="an-foot">AIQYN ZHOL · Шымкент қаласының жол инфрақұрылымын автоматты бақылау жүйесі</p>`;
+
+    requestAnimationFrame(() => document.getElementById('an-root').classList.add('on'));
+    setTimeout(() => document.getElementById('an-root').classList.add('on'), 120);
+  }).catch(() => {
+    document.getElementById('an-root').innerHTML =
+      '<div class="an-loading">Аналитика жүктелмеді. Сайт қосулы ма?</div>';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{
+  "measured_at": "2026-08-17T14:14:05+05:00",
+  "host": {
+    "os": "Windows 11",
+    "machine": "AMD64",
+    "python": "3.13.0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "openvino": "2026.3.0-22451-8a17657b995-releases/2026/3",
+    "openvino_devices": [
+      "CPU",
+      "GPU"
+    ],
+    "gpu_name": "Intel(R) Iris(R) Xe Graphics (iGPU)",
+    "ultralytics": "8.4.118"
+  },
+  "settings": {
+    "conf": 0.3,
+    "imgsz": 640,
+    "runs": 40
+  },
+  "weights": "models\\RDD_best.pt",
+  "frames": [
+    "evidence\\AIQYN-20260814-181137-31b567_raw.jpg",
+    "evidence\\AIQYN-20260814-181138-f3b057_raw.jpg",
+    "evidence\\AIQYN-20260814-181140-fba8ed_raw.jpg",
+    "evidence\\AIQYN-20260814-181143-495033_raw.jpg",
+    "evidence\\AIQYN-20260814-181552-79de9f_raw.jpg",
+    "evidence\\AIQYN-20260814-181552-a96a31_raw.jpg",
+    "evidence\\AIQYN-20260814-181553-d046cf_raw.jpg",
+    "evidence\\AIQYN-20260814-181554-02895b_raw.jpg"
+  ],
+  "devices": {
+    "cpu · процессор": {
+      "runs": 40,
+      "unique_frames": 8,
+      "frame_size": "1920x1080",
+      "latency_ms_median": 86.0,
+      "latency_ms_mean": 87.9,
+      "latency_ms_min": 82.3,
+      "latency_ms_p95": 107.7,
+      "detect_fps_median": 11.6,
+      "detections_total": 15,
+      "detections_per_class": {
+        "Potholes": 10,
+        "Longitudinal Crack": 5
+      }
+    },
+    "intel:gpu · OpenVINO iGPU": {
+      "runs": 40,
+      "unique_frames": 8,
+      "frame_size": "1920x1080",
+      "latency_ms_median": 28.3,
+      "latency_ms_mean": 28.4,
+      "latency_ms_min": 27.1,
+      "latency_ms_p95": 30.2,
+      "detect_fps_median": 35.4,
+      "detections_total": 15,
+      "detections_per_class": {
+        "Potholes": 10,
+        "Longitudinal Crack": 5
+      }
+    }
+  },
+  "pipeline_detection_to_document": {
+    "events": 62,
+    "seconds_median": 15.0,
+    "seconds_mean": 15.8,
+    "seconds_min": 7.7,
+    "seconds_p90": 21.1,
+    "seconds_max": 36.7,
+    "method": "evidence/*.json: timestamp -> file mtime"
+  }
+}

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import threading
 import time
@@ -78,8 +79,10 @@ class PortalSender:
                 else:
                     data[key] = str(value)
 
+            token = os.getenv("AIQYN_INGEST_TOKEN", "").strip()
             response = self._session.post(
-                self.endpoint, data=data, files=files, timeout=self.cfg.send_timeout
+                self.endpoint, data=data, files=files, timeout=self.cfg.send_timeout,
+                headers={"X-AIQYN-Token": token} if token else None,
             )
             if response.status_code >= 400:
                 log.warning("Сайт қатемен жауап берді (%s): %s",

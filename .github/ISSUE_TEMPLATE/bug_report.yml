@@ -1,0 +1,65 @@
+name: 🐞 Bug report / Қате туралы хабарлау
+description: Жұмыс істемей тұрған нәрсені хабарлаңыз / Report something that is not working
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Рақмет! Төмендегі өрістерді толтырсаңыз, қатені тезірек табамыз.
+        Thanks — filling these in helps track the problem down faster.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Не болды? / What happened?
+      description: Не күттіңіз және орнына не болды? / What did you expect, and what happened instead?
+      placeholder: Мысалы — оқушы ретінде кіргенде бет бос қалады...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Қайталау қадамдары / Steps to reproduce
+      description: Қатені қайталау үшін не істеу керек?
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Қай ортада? / Where?
+      options:
+        - Локалда (npm run dev / gradlew)
+        - Production (тірі сайт / live app)
+        - Екеуінде де / Both
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Браузер / құрылғы / Browser or device
+      placeholder: "Chrome 141 · Windows 11  /  Pixel 7 · Android 14"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Қате хабарламасы / Error output
+      description: Консоль немесе лог. Автоматты түрде код блогына салынады.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Тексеру / Checklist
+      options:
+        - label: Ұқсас issue бұрын ашылмағанын тексердім / I searched existing issues
+          required: true
+        - label: Хабарламада ешқандай құпия кілт немесе жеке дерек жоқ / No secrets or personal data included
+          required: true

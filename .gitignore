@@ -3,6 +3,9 @@
 
 # Модель салмағы (85 МБ) — scripts/fetch_weights.py арқылы жүктеледі
 models/*.pt
+# Intel графикасына арналған нұсқа — бірінші қосылғанда автоматты құрылады
+models/*_openvino_model/
+models/*.onnx
 
 # Жұмыс файлдары
 evidence/
@@ -27,3 +30,21 @@ portal/aiqyn.db*
 audit/
 
 .vercel
+
+# Промо-видеолар мен баяндама файлдары (126 МБ) — репозиторийге емес
+reports/
+
+# Тұрғындардың хабарламалары — байланыс деректері болуы мүмкін
+portal/citizen_reports.jsonl
+
+# Офлайн карта кэші — Esri тақтайшаларын қайта таратуға болмайды
+portal/static/tiles/
+
+# Бөгде skill-дер мен жергілікті құралдар
+.agents/
+skills-lock.json
+.claude/skills/
+
+# Уақытша файлдар
+kernel.errors.txt
+portal/_old/

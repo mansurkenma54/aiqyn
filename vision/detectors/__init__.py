@@ -14,7 +14,7 @@ from typing import Optional
 import numpy as np
 
 from ..config import Config
-from .base import Detection, Detector, merge_overlapping
+from .base import Detection, Detector, merge_fragments, merge_overlapping
 from .confirm import TemporalConfirmer
 from .pothole_cv import PotholeCvDetector
 from .flood import FloodDetector
@@ -46,14 +46,18 @@ class DetectorBank:
         self.lane_detector = LaneDetector() if (cfg.draw_lanes or cfg.enable_flood) else None
         # Жолдың шекарасы — таңбалау жоқ көшелерде де жұмыс істейді.
         # road_only қосулы болса, ол МІНДЕТТІ: ақау тек сол шекараның
-        # ішінен ізделеді.
+        # ішінен ізделеді. Физикалық детектор да (pothole_cv) шұңқырды тек
+        # жол маскасының ішінен іздейді — маскасыз ол әрқашан бос қайтарады.
         self.road_detector = (
             RoadBoundaryDetector()
-            if (cfg.draw_lanes or cfg.enable_flood or cfg.road_only)
+            if (cfg.draw_lanes or cfg.enable_flood or cfg.road_only
+                or cfg.enable_pothole_cv)
             else None
         )
         self.confirmer = (
-            TemporalConfirmer(cfg.confirm_frames, cfg.confirm_window, cfg.track_iou)
+            TemporalConfirmer(cfg.confirm_frames, cfg.confirm_window, cfg.track_iou,
+                              max_center_gap=cfg.track_center_gap,
+                              cross_class=cfg.track_cross_class)
             if cfg.confirm_frames > 1
             else None
         )
@@ -143,14 +147,30 @@ class DetectorBank:
             self._timings[detector.name] = (time.time() - started) * 1000
 
         detections = merge_overlapping(detections)
+        # Бір ақаудың бөлшектерін біріктіру: үлкен қирау аймағы есепте
+        # 3 бөлек ақау емес, БІР ақау болып шығуы керек
+        if self.cfg.merge_fragments:
+            detections = merge_fragments(detections, self.cfg.merge_gap_px)
 
-        # --- 3-САТЫ: ЖОЛ БЕТІМЕН ШЕКТЕУ ---
+        # --- 3-САТЫ: ЖҮРУ ДӘЛІЗІ (кадрдың жиегін ескермеу) ---
+        if self.cfg.roi_left_frac > 0 or self.cfg.roi_right_frac > 0:
+            width = image.shape[1]
+            left = width * self.cfg.roi_left_frac
+            right = width * (1.0 - self.cfg.roi_right_frac)
+            before = len(detections)
+            detections = [
+                d for d in detections
+                if left <= (d.bbox[0] + d.bbox[2]) / 2.0 <= right
+            ]
+            self.dropped_off_road += before - len(detections)
+
+        # --- 4-САТЫ: ЖОЛ БЕТІМЕН ШЕКТЕУ ---
         if self.cfg.road_only:
             before = len(detections)
             detections = self._keep_on_road(detections, road)
             self.dropped_off_road += before - len(detections)
 
-        # --- 4-САТЫ: УАҚЫТ БОЙЫНША РАСТАУ ---
+        # --- 5-САТЫ: УАҚЫТ БОЙЫНША РАСТАУ ---
         # Оқиға тек бірнеше кадрда расталғаннан кейін ғана құрылады
         context["confirmed"] = (
             self.confirmer.update(detections) if self.confirmer else detections
@@ -190,6 +210,15 @@ class DetectorBank:
                 kept.append(detection)
 
         return kept
+
+    @property
+    def device_label(self) -> str:
+        """Талдау қай құрылғыда жүріп жатыр (интерфейсте көрсету үшін)."""
+        for detector in self.detectors:
+            label = getattr(detector, "device_label", None)
+            if label:
+                return label
+        return "процессор"
 
     @property
     def is_night_now(self) -> bool:

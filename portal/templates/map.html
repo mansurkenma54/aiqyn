@@ -2,16 +2,46 @@
 <html lang="kk">
 <head>
   <meta charset="utf-8">
+  <script src="/static/i18n-ru.js"></script>
+  <script src="/static/i18n.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#050506">
   <title>AIQYN Portal — инфрақұрылым мониторингі</title>
 
-  <link rel="preconnect" href="https://unpkg.com">
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <!-- Кітапханалар жобаның ішінде: интернет үзілсе де интерфейс толық жүктеледі.
+       Жаңарту: python scripts/vendor_assets.py -->
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+  <!-- Шрифттер бірден жүктеледі: preload болмаса, бет әуелі жүйелік
+       шрифтпен көрініп, содан кейін секіріп ауысады (FOUT). -->
+  <script>
+    /* Тема САНАУЫ бетті бояуға дейін қойылады: әйтпесе ақ тема
+       таңдалған адам әр ашқанда қара экранның жарқ етуін көреді. */
+    try {
+      var t = localStorage.getItem('aiqyn_theme');
+      if (t) document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <link rel="preload" href="/static/vendor/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/vendor/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/vendor/fonts/mono-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="canonical" href="https://aiqyn-alpha.vercel.app/portal">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AIQYN">
+  <meta property="og:locale" content="kk_KZ">
+  <meta property="og:title" content="AIQYN — оператор картасы">
+  <meta property="og:description" content="Камера жол ақауын өзі табады, дәлелін жинайды және ресми өтінімді дайындайды. Оператор тексеріп, 109-ға жібереді.">
+  <meta property="og:url" content="https://aiqyn-alpha.vercel.app/portal">
+  <meta property="og:image" content="https://aiqyn-alpha.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="AIQYN — жол ақауын автоматты бақылау">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://aiqyn-alpha.vercel.app/og-image.png">
 </head>
 <body>
 
@@ -19,12 +49,22 @@
   <a class="brand" href="/" aria-label="AIQYN Portal бас беті">
     <span class="brand-mark" aria-hidden="true"></span>
     <span class="brand-copy">
-      <strong>AIQYN</strong><span>Portal</span>
+      <strong>AI<em>qyn zhol</em></strong><span>Portal</span>
       <small>Шымкент · инфрақұрылым мониторингі</small>
     </span>
   </a>
 
-  <div class="stats" id="stats" aria-label="Жүйе статистикасы"></div>
+  <!-- Хидерде сан жоқ: оператордың жұмысы — кезек, ал сандар аналитика
+       бетінде толығырақ әрі мағыналырақ тұрады. Мұнда тек ӘРЕКЕТ. -->
+  <!-- Мекенжай / сілтеме бойынша іздеу: картадан нүкте табу және
+       сол жерге қолмен оқиға қосу -->
+  <div class="geo-search" id="geo-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input id="geo-input" type="search" autocomplete="off"
+           placeholder="Мекенжай, көше немесе картаның сілтемесі">
+    <button class="geo-clear" id="geo-clear" aria-label="Тазалау" hidden><i class="fa-solid fa-xmark"></i></button>
+    <div class="geo-results" id="geo-results" hidden></div>
+  </div>
 
   <div class="topbar-actions">
     <label class="live-toggle" title="Деректерді әр 5 секунд сайын жаңарту">
@@ -32,12 +72,54 @@
       <span class="switch-track" aria-hidden="true"><span></span></span>
       <span class="live-label"><i class="fa-solid fa-circle" aria-hidden="true"></i> Тікелей эфир</span>
     </label>
-    <button class="icon-btn has-label" id="btn-export" title="CSV есебін жүктеу">
-      <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i><span>Есеп</span>
+
+    <!-- Картаға қосу: бір батырма — бірнеше әрекет -->
+    <div class="menu-wrap" id="map-menu-wrap">
+      <button class="btn btn-ghost" id="btn-map-menu" aria-haspopup="true" aria-expanded="false">
+        <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Картаға қосу</span>
+        <i class="fa-solid fa-chevron-down chev" aria-hidden="true"></i>
+      </button>
+      <div class="menu" id="map-menu" role="menu" hidden>
+        <button role="menuitem" data-kind="repair">
+          <i class="fa-solid fa-person-digging" style="color:#ffd60a"></i>
+          <span><b>Жол жұмысы</b><small>Жөнделіп жатқан учаске — сары</small></span>
+        </button>
+        <button role="menuitem" data-kind="closed">
+          <i class="fa-solid fa-ban" style="color:#ff453a"></i>
+          <span><b>Жабық жол</b><small>Қозғалыс жабылған — қызыл</small></span>
+        </button>
+        <button role="menuitem" data-kind="ignore">
+          <i class="fa-solid fa-eye-slash" style="color:#98989f"></i>
+          <span><b>Ішкі аймақ</b><small>Мұнда өтінім жасалмайды</small></span>
+        </button>
+        <hr>
+        <button role="menuitem" id="menu-photo">
+          <i class="fa-solid fa-image" style="color:#25d366"></i>
+          <span><b>Суреттен автоматты қосу</b><small>Сурет жүктейсіз — қалғанын жүйе істейді</small></span>
+        </button>
+        <input type="file" id="photo-input" accept="image/*,.heic,.HEIC" hidden>
+        <button role="menuitem" id="menu-manual">
+          <i class="fa-solid fa-square-plus" style="color:#ff453a"></i>
+          <span><b>Қолмен оқиға қосу</b><small>Анкета толтырып, картаға тіркеу</small></span>
+        </button>
+        <button role="menuitem" id="menu-zones">
+          <i class="fa-solid fa-list-check" style="color:#1adfe3"></i>
+          <span><b>Учаскелер тізімі</b><small>Барлығын көру және өшіру</small></span>
+        </button>
+        <button role="menuitem" id="menu-boundary">
+          <i class="fa-solid fa-draw-polygon" style="color:#0a84ff"></i>
+          <span><b>Қала шекарасы</b><small>Көрсету / жасыру</small></span>
+        </button>
+      </div>
+    </div>
+
+    <span data-lang-switch></span>
+    <button class="icon-btn" id="theme-toggle" title="Ақ тема" aria-label="Тема ауыстыру">
+      <i class="fa-solid fa-sun" aria-hidden="true"></i>
     </button>
-    <button class="btn btn-warning" id="btn-zone">
-      <i class="fa-solid fa-road-barrier" aria-hidden="true"></i><span>Жол учаскесін белгілеу</span>
-    </button>
+    <a class="btn btn-primary" href="/analytics" title="Аналитика және есептілік">
+      <i class="fa-solid fa-chart-column" aria-hidden="true"></i><span>Аналитика және есеп</span>
+    </a>
     <button class="operator-btn" id="btn-login" aria-label="Оператор ретінде кіру">
       <span class="operator-avatar"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
       <span class="operator-copy"><small>Оператор</small><strong id="operator-label">Кірмеген</strong></span>
@@ -53,6 +135,9 @@
         <h1>Оқиғалар</h1>
       </div>
       <span class="connection-pill" id="connection-pill"><i class="fa-solid fa-circle"></i> Желіде</span>
+      <button class="side-toggle" id="side-toggle" title="Тізімді жию / ашу" aria-label="Тізімді жию">
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+      </button>
     </div>
 
     <div class="search-wrap">
@@ -99,8 +184,12 @@
 
     <div class="list-summary">
       <span id="list-count">0 оқиға</span>
+      <span class="queue-done" id="queue-done" hidden></span>
       <button class="text-btn" id="btn-show-all">Картада барлығын көрсету</button>
     </div>
+    <p class="queue-hint" aria-hidden="true">
+      <kbd>j</kbd><kbd>k</kbd> жүру · <kbd>Enter</kbd> растау · <kbd>x</kbd> жалған · <kbd>/</kbd> іздеу
+    </p>
     <div class="list" id="list" aria-live="polite">
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
@@ -111,6 +200,11 @@
 
   <section class="map-wrap" aria-label="Шымкент қаласының инфрақұрылым картасы">
     <div id="map"></div>
+
+    <div class="basemap-note" id="basemap-note" role="status" hidden>
+      <i class="fa-solid fa-wifi" aria-hidden="true"></i>
+      <span>Байланыс жоқ</span>
+    </div>
 
     <div class="map-title-card">
       <p class="eyebrow">Жедел жағдай</p>
@@ -168,11 +262,117 @@
     <h2 id="login-title">Оператор ретінде кіру</h2>
     <p class="muted">Оқиғаны тексеру, жол учаскесін белгілеу және өтінім жіберу үшін қажет.</p>
     <label class="form-field"><span>Логин</span><input type="text" id="login-user" value="admin" autocomplete="username"></label>
-    <label class="form-field"><span>Құпия сөз</span><input type="password" id="login-pass" autocomplete="current-password"></label>
+    <label class="form-field"><span>Құпия сөз</span><input type="password" id="login-pass" value="" autocomplete="current-password"></label>
+    <p class="muted" style="margin:-4px 0 0;font-size:11.5px">
+      Құпия сөз <code>.env</code> файлындағы <code>AIQYN_ADMIN_PASSWORD</code>.
+      Пилотта SSO арқылы ауыстырылады.
+    </p>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="login-cancel">Болдырмау</button>
       <button class="btn btn-primary" id="login-submit">Кіру</button>
     </div>
+  </div>
+</div>
+
+<!-- Толық карточка: тексеру керек болғанда ғана ашылатын үлкен терезе -->
+<div class="modal modal--full" id="full-modal" role="dialog" aria-modal="true" aria-label="Оқиғаның толық карточкасы">
+  <div class="modal-box modal-full-box">
+    <button class="modal-close" id="full-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <div id="full-body"></div>
+  </div>
+</div>
+
+<!-- Қолмен енгізу анкетасы: бір экранға сыяды, айналдырудың қажеті жоқ -->
+<!-- iKomek 109-ға жүгіну -->
+<div class="modal" id="komek-modal" role="dialog" aria-modal="true" aria-label="iKomek 109-ға жүгіну">
+  <div class="modal-box modal-lg">
+    <button class="modal-close" id="komek-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <div id="komek-body"></div>
+  </div>
+</div>
+
+<div class="modal" id="manual-modal" role="dialog" aria-modal="true" aria-labelledby="manual-title">
+  <div class="modal-box modal-lg">
+    <button class="modal-close" id="manual-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <p class="eyebrow">Картаға енгізу</p>
+    <h2 id="manual-title">Ақау туралы жаңа жазба</h2>
+    <p class="muted">Патруль көлігі әлі өтпеген жердегі ақау. Тіркелген соң ол
+      оператор кезегіне түседі де, әдеттегідей тексеріледі.</p>
+
+    <div class="ask">
+      <div class="ask-row">
+        <span class="ask-n">1</span>
+        <div class="ask-body">
+          <label class="ask-q" for="man-type">Қандай ақау?</label>
+          <select id="man-type"></select>
+        </div>
+      </div>
+
+      <div class="ask-row">
+        <span class="ask-n">2</span>
+        <div class="ask-body">
+          <span class="ask-q">Қауіптілігі қандай?</span>
+          <div class="sev-picker" role="radiogroup" aria-label="Қауіп деңгейі">
+            <label><input type="radio" name="man-sev" value="low"><span>Төмен</span></label>
+            <label><input type="radio" name="man-sev" value="medium" checked><span>Орташа</span></label>
+            <label><input type="radio" name="man-sev" value="high"><span>Жоғары</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="ask-row">
+        <span class="ask-n">3</span>
+        <div class="ask-body">
+          <label class="ask-q" for="man-addr">Қай жерде? <b>*</b></label>
+          <div class="ask-place">
+            <input id="man-addr" type="search" autocomplete="off"
+                   placeholder="Мекенжайды жазыңыз немесе картадан таңдаңыз">
+            <button class="btn btn-ghost" id="man-pick" type="button">
+              <i class="fa-solid fa-crosshairs"></i> Картадан</button>
+          </div>
+          <div class="geo-results geo-results--inline" id="man-results" hidden></div>
+          <p class="ask-point" id="man-point">Нүкте әлі таңдалмаған</p>
+        </div>
+      </div>
+
+      <div class="ask-row">
+        <span class="ask-n">4</span>
+        <div class="ask-body">
+          <label class="ask-q" for="man-note">Не көрдіңіз? <small>міндетті емес</small></label>
+          <textarea id="man-note" rows="2" placeholder="Мысалы: жол ортасында терең шұңқыр, айналып өту қиын"></textarea>
+        </div>
+      </div>
+
+      <div class="ask-row">
+        <span class="ask-n">5</span>
+        <div class="ask-body">
+          <span class="ask-q">Фото бар ма? <small>болса — ЖИ оны тексереді</small></span>
+          <div class="ask-place">
+            <input id="man-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+            <button class="btn btn-ghost" id="man-photo-btn" type="button">
+              <i class="fa-solid fa-camera"></i> Сурет таңдау</button>
+            <input id="man-reporter" type="text" placeholder="Хабарлаған адам (міндетті емес)">
+          </div>
+          <p class="ask-point" id="man-photo-name" hidden></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="manual-cancel">Болдырмау</button>
+      <button class="btn btn-primary" id="manual-save">
+        <i class="fa-solid fa-square-plus"></i> Тіркеу және картаға қосу</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="zones-modal" role="dialog" aria-modal="true" aria-labelledby="zones-title">
+  <div class="modal-box">
+    <button class="modal-close" id="zones-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
+    <p class="eyebrow">Картадағы учаскелер</p>
+    <h2 id="zones-title">Жол жұмыстары және жабық жолдар</h2>
+    <p class="muted" id="zones-count">0 учаске</p>
+    <div class="zones-list" id="zones-list"></div>
   </div>
 </div>
 
@@ -203,7 +403,7 @@
 
     <label class="check-row">
       <input type="checkbox" id="zone-verified">
-      <span><b>Шекараны оператор нақтылады</b><small>Тек нақтыланған учаскелерде жаңа AI өтінімдері автоматты түрде тоқтатылады.</small></span>
+      <span><b>Шекараны оператор нақтылады</b><small>Тек нақтыланған учаскелерде жаңа ЖИ өтінімдері автоматты түрде тоқтатылады.</small></span>
     </label>
 
     <div class="modal-actions">
@@ -218,7 +418,15 @@
     <button class="modal-close" id="reject-close" aria-label="Терезені жабу"><i class="fa-solid fa-xmark"></i></button>
     <p class="eyebrow danger">Оператор шешімі</p>
     <h2 id="reject-title">Анықтауды қабылдамау</h2>
-    <label class="form-field"><span>Себебі <b>*</b></span>
+    <p class="muted" style="margin:-4px 0 12px">Себепті басыңыз немесе нөмірін теріңіз — шешім бірден сақталады.</p>
+    <div class="reject-quick" id="reject-quick">
+      <button type="button" data-n="1"><kbd>1</kbd><span>Жалған анықтау<small>көлеңке, шалшық, жапырақ, жамау</small></span></button>
+      <button type="button" data-n="2"><kbd>2</kbd><span>Дубликат<small>бұл ақау бұрын тіркелген</small></span></button>
+      <button type="button" data-n="3"><kbd>3</kbd><span>Жөндеу жүріп жатыр<small>белгілі жөндеу учаскесі</small></span></button>
+      <button type="button" data-n="4"><kbd>4</kbd><span>Дәлел жеткіліксіз<small>кадр бұлдыр немесе қараңғы</small></span></button>
+      <button type="button" data-n="5"><kbd>5</kbd><span>Орны дұрыс емес<small>координата басқа жерде</small></span></button>
+    </div>
+    <label class="form-field"><span>Немесе толық түсініктемемен</span>
       <select id="reject-reason">
         <option value="false_positive">Жалған анықтау</option>
         <option value="duplicate">Бұрын тіркелген дубликат</option>
@@ -237,7 +445,29 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/app.js"></script>
+<script>
+/* Бетті ауыстырғанда логотипі бар жүктелу экраны — сайттағыдай.
+   Портал мен басты бет бір өнім болып сезілуі үшін. */
+(function () {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.target || a.hasAttribute('download')) return;
+    var href = a.getAttribute('href');
+    if (!href || href.charAt(0) === '#' || /^(mailto|tel):/.test(href)) return;
+    if (a.origin && a.origin !== location.origin) return;
+    if (a.pathname === location.pathname) return;
+    e.preventDefault();
+    var over = document.createElement('div');
+    over.className = 'page-leave';
+    over.innerHTML = '<img src="/logo.svg" width="112" height="112" alt="">' +
+      '<span>AIQYN ZHOL</span><i></i>';
+    document.body.appendChild(over);
+    setTimeout(function () { location.href = href; }, 560);
+  });
+})();
+</script>
 </body>
 </html>

@@ -37,7 +37,9 @@ class Recording:
     ends_at: float
     target_frames: int
     best_image: Optional[np.ndarray] = None
-    best_confidence: float = 0.0
+    # «Ең жақсы кадр» бағасы: сенімділік ЖӘНЕ ақаудың кадрдағы өлшемі
+    # (алыстағы бірнеше пиксель емес, анық көрінген кадр керек).
+    best_score: float = 0.0
     meta: dict = field(default_factory=dict)
 
     @property
@@ -107,12 +109,32 @@ class EvidenceRecorder:
 
     # ---------- кадр ағыны ----------
 
+    def _for_clip(self, image: np.ndarray) -> np.ndarray:
+        """Клипке арналған кішірейтілген көшірме.
+
+        МАҢЫЗДЫ (жад): 1080p кадр 6,2 МБ орын алады. 8 секундтық клип =
+        240 кадр = 1,5 ГБ. Екі оқиға қатар жазылса — 3 ГБ, содан жүйе
+        тұтылып, негізгі цикл 2 секундқа қатып қалатын. Клипке 1080p
+        мүлдем қажет емес: ол дәлел ретінде қаралады, ал ресми ФОТО
+        бөлек, толық ажыратымдылықта сақталады.
+        """
+        width = int(self.cfg.clip_width)
+        if width <= 0 or image.shape[1] <= width:
+            return image
+        scale = width / float(image.shape[1])
+        return cv2.resize(
+            image, (width, max(2, int(image.shape[0] * scale))),
+            interpolation=cv2.INTER_AREA,
+        )
+
     def feed(self, image: np.ndarray) -> None:
         """Әр кадрды осында береміз."""
+        # Кішірейтуді ҚҰЛЫПТАН ТЫС жасаймыз — жазғыш ағындарды тоспау үшін
+        small = self._for_clip(image)
         with self._lock:
-            self._buffer.append(image)
+            self._buffer.append(small)
             for recording in self._active.values():
-                recording.frames.append(image)
+                recording.frames.append(small)
 
             finished = [rec for rec in self._active.values() if rec.is_complete]
             for recording in finished:
@@ -127,7 +149,7 @@ class EvidenceRecorder:
         self,
         event_id: str,
         best_image: Optional[np.ndarray] = None,
-        confidence: float = 0.0,
+        score: float = 0.0,
         meta: Optional[dict] = None,
     ) -> None:
         """Жаңа оқиға бойынша дәлел жинауды бастау."""
@@ -144,18 +166,35 @@ class EvidenceRecorder:
                 ends_at=now + self.cfg.post_roll_sec * 3.0,   # тек сақтандыру шегі
                 target_frames=target,
                 best_image=best_image if best_image is not None else (pre_roll[-1] if pre_roll else None),
-                best_confidence=confidence,
+                best_score=score,
                 meta=meta or {},
             )
         log.info("Дәлел жиналуда: %s (pre-roll %d кадр)", event_id, len(pre_roll))
 
-    def update_best(self, event_id: str, image: np.ndarray, confidence: float) -> None:
-        """Анығырақ кадр табылса — дәлел фотосын жаңарту."""
+    def update_best(self, event_id: str, image: np.ndarray, score: float,
+                    meta_patch: Optional[dict] = None) -> bool:
+        """Анығырақ кадр табылса — дәлел фотосын жаңарту.
+
+        Ақау алыстан алғаш көрінгенде кадрда бірнеше пиксель ғана болады.
+        Ресми құжатқа сол сурет түссе, оператор да, жауапты орган да
+        ештеңе көрмейді. Сондықтан оқиға жазылып жатқанда сол ақаудың
+        ЕҢ АНЫҚ көрінген кадрын іздеп отырамыз.
+
+        meta_patch — фотомен бірге bbox/сенімділік те жаңаруы керек,
+        әйтпесе рамка ЕСКІ орынға салынып қалады.
+        """
         with self._lock:
             recording = self._active.get(event_id)
-            if recording and confidence > recording.best_confidence:
-                recording.best_image = image
-                recording.best_confidence = confidence
+            if recording is None or score <= recording.best_score:
+                return False
+            recording.best_image = image
+            recording.best_score = score
+            if meta_patch:
+                extra_patch = meta_patch.pop("extra", None)
+                recording.meta.update(meta_patch)
+                if extra_patch:
+                    recording.meta.setdefault("extra", {}).update(extra_patch)
+            return True
 
     @property
     def active_count(self) -> int:

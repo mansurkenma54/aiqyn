@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340"><title>AIQYN</title><g transform="scale(1.0667,0.5397)"><rect width="1200" height="630" fill="#0A0C0F"/>
+      <g stroke="#00E0FF" stroke-opacity=".12" stroke-width="2" fill="none">
+        <path d="M0 0 H1200"/><path d="M0 52 H1200"/><path d="M0 104 H1200"/><path d="M0 156 H1200"/><path d="M0 208 H1200"/><path d="M0 260 H1200"/><path d="M0 312 H1200"/><path d="M0 364 H1200"/><path d="M0 416 H1200"/><path d="M0 468 H1200"/><path d="M0 520 H1200"/><path d="M0 572 H1200"/><path d="M0 624 H1200"/>
+        <path d="M0 0 V630"/><path d="M50 0 V630"/><path d="M100 0 V630"/><path d="M150 0 V630"/><path d="M200 0 V630"/><path d="M250 0 V630"/><path d="M300 0 V630"/><path d="M350 0 V630"/><path d="M400 0 V630"/><path d="M450 0 V630"/><path d="M500 0 V630"/><path d="M550 0 V630"/><path d="M600 0 V630"/><path d="M650 0 V630"/><path d="M700 0 V630"/><path d="M750 0 V630"/><path d="M800 0 V630"/><path d="M850 0 V630"/><path d="M900 0 V630"/><path d="M950 0 V630"/><path d="M1000 0 V630"/><path d="M1050 0 V630"/><path d="M1100 0 V630"/><path d="M1150 0 V630"/><path d="M1200 0 V630"/>
+      </g>
+      <g stroke="#FFC933" stroke-opacity=".5" stroke-width="4" fill="none" stroke-linecap="round">
+        <path d="M840 150 V110 H890"/><path d="M1100 110 H1150 V150"/>
+        <path d="M840 480 V520 H890"/><path d="M1150 480 V520 H1100"/>
+      </g></g><g transform="translate(78,104) scale(2.1)">
+    <rect width="64" height="64" rx="17" fill="#0A0C0F"/>
+    <g stroke="#00E0FF" stroke-width="3" stroke-linecap="round" fill="none" opacity=".9">
+      <path d="M13 24 V16 H21"/><path d="M43 16 H51 V24"/>
+      <path d="M13 40 V48 H21"/><path d="M51 40 V48 H43"/>
+    </g>
+    <path d="M17 32 L22 26.5 L26 36 L30 28.5 L34 34 L38 31.5 L41 32.4 H47"
+          fill="none" stroke="#FFC933" stroke-width="3.6"
+          stroke-linecap="round" stroke-linejoin="round"/></g><text x="240" y="164" font-family="Space Grotesk, Segoe UI Semibold, Segoe UI, Arial, sans-serif" font-size="66"
+       font-weight="700" fill="#E8EDF2" letter-spacing="-1">AIQYN</text><text x="243" y="208" font-family="IBM Plex Sans, Segoe UI Semibold, Segoe UI, Arial, sans-serif" font-size="24"
+       fill="#FFC933">Камерадан ресми құжатқа дейін — автоматты</text><text x="243" y="240" font-family="IBM Plex Sans, Segoe UI Semibold, Segoe UI, Arial, sans-serif" font-size="20"
+       fill="#E8EDF2" fill-opacity=".55">From camera frame to filed report</text></svg>

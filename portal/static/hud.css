@@ -1,0 +1,415 @@
+/* ============================================================
+   AIQYN ZHOL — ӨНІМ ИНТЕРФЕЙСІНІҢ ТІЛІ
+   ------------------------------------------------------------
+   Кадр рамкасы, қалқыма дәлел карточкасы, архитектура схемасы,
+   «адамның көзі / жүйенің көзі» тұтқасы, тірі портал терезесі.
+
+   ЕРЕЖЕ: мәтін кадрдың үстінде тұрмайды. Барлық сипаттама —
+   кадрдың астындағы жолақта немесе жанындағы карточкада.
+   ============================================================ */
+
+/* ---------- 1. Кадр ---------- */
+
+.frame {
+  position: relative;
+  border-radius: var(--aq-r-l); overflow: hidden;
+  background: #0b0b0c; border: 1px solid var(--aq-border);
+  box-shadow: var(--aq-shadow-lift);
+}
+.sec-black .frame { border-color: var(--aq-hair-2); box-shadow: var(--aq-shadow-deep); }
+
+/* Кадр ешқашан экранды толық алмайды: бәрі бір пропорцияда — 16:9.
+   Түпнұсқа файлдың биіктігі әртүрлі болса да, тор бұзылмайды. */
+.frame > img, .frame > video {
+  width: 100%; display: block;
+  aspect-ratio: 16 / 9; object-fit: cover;
+}
+/* Тік видео (телефоннан жазылған далалық кадр) — өз пропорциясында,
+   бірақ биіктігі шектеулі */
+.frame--portrait { max-width: 340px; margin-inline: auto; }
+.frame--portrait > video, .frame--portrait > img {
+  aspect-ratio: 9 / 16; max-height: 440px; object-fit: cover;
+}
+
+/* Кадр үстіндегі жалғыз элемент — бұрыш жақшалары */
+.br {
+  position: absolute; z-index: 3; width: 16px; height: 16px;
+  border: 1.5px solid rgba(255, 255, 255, .85); opacity: 0;
+  transition: opacity var(--aq-t-ui) var(--aq-ease), transform var(--aq-t-ui) var(--aq-ease);
+}
+.br.tl { left: 14px; top: 14px;     border-right: 0; border-bottom: 0; transform: translate(7px, 7px); }
+.br.tr { right: 14px; top: 14px;    border-left: 0;  border-bottom: 0; transform: translate(-7px, 7px); }
+.br.bl { left: 14px; bottom: 14px;  border-right: 0; border-top: 0;    transform: translate(7px, -7px); }
+.br.rb { right: 14px; bottom: 14px; border-left: 0;  border-top: 0;    transform: translate(-7px, -7px); }
+.on > .br { opacity: 1; transform: none; }
+.on > .br.tr { transition-delay: 80ms; }
+.on > .br.bl { transition-delay: 160ms; }
+.on > .br.rb { transition-delay: 240ms; }
+
+/* Кадрдың АСТЫНДАҒЫ метажолақ */
+.frame-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  margin-top: var(--aq-s3); padding: 0 4px;
+  font: 500 11.5px/1.5 var(--aq-mono); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--aq-soft);
+}
+.sec-black .frame-meta { color: var(--aq-on-black-2); }
+.frame-meta .rec { display: inline-flex; align-items: center; gap: 8px; color: var(--aq-muted); }
+.sec-black .frame-meta .rec { color: var(--aq-on-black); }
+.frame-meta .rec::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--aq-red-mid); animation: livePulse 2s var(--aq-ease) infinite;
+}
+.frame-meta .sep { margin-left: auto; }
+
+.frame-cap {
+  margin-top: var(--aq-s3); padding: 0 4px;
+  font-size: 14px; line-height: 1.55; color: var(--aq-muted);
+}
+.sec-black .frame-cap { color: var(--aq-on-black-2); }
+
+/* ---------- 2. Сканер сызығы — hero-да ғана ---------- */
+
+.scan { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+.scan i {
+  position: absolute; left: 0; right: 0; top: -2px; height: 1px; opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(26, 223, 227, .9), transparent);
+}
+.scan.on i { animation: sweep 6s var(--aq-ease) 1.2s infinite; }
+@keyframes sweep {
+  0%   { top: -2px; opacity: 0; }
+  8%   { opacity: .8; }
+  82%  { opacity: .5; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ---------- 3a. Дәлел жолағы ----------
+   Кадрдың АСТЫНДА тұрады. Бұрын үстінде тұрып суретті жауып қалатын. */
+
+.ev-strip {
+  margin-top: var(--aq-s3); padding: 18px 20px;
+  background: var(--aq-surface); border: 1px solid var(--aq-border);
+  border-radius: var(--aq-r-m);
+}
+.ev-strip .ev-id {
+  display: block; margin-bottom: 6px;
+  font: 400 10.5px/1.5 var(--aq-mono); color: var(--aq-teal);
+  overflow-wrap: anywhere;
+}
+.ev-strip .ev-t {
+  display: block; font-family: var(--aq-display); font-size: 16px; font-weight: 750;
+  letter-spacing: -.03em; color: var(--aq-text);
+}
+.ev-data {
+  display: flex; flex-wrap: wrap; gap: 10px 28px;
+  margin: var(--aq-s3) 0 0; padding-top: var(--aq-s3);
+  border-top: 1px solid var(--aq-border);
+}
+.ev-data > div { display: grid; gap: 2px; }
+.ev-data dt { font: 500 10.5px/1.4 var(--aq-mono); letter-spacing: .1em;
+              text-transform: uppercase; color: var(--aq-soft); }
+.ev-data dd { margin: 0; font: 600 14px/1.3 var(--aq-sans); color: var(--aq-text); }
+.ev-data dd.hot { color: var(--aq-red); }
+
+/* ---------- 3. Қалқыма дәлел карточкасы ---------- */
+
+.float-card {
+  position: absolute; z-index: 5; right: -16px; bottom: 44px;
+  width: min(272px, 78%); padding: 16px 18px;
+  background: rgba(255, 255, 255, .94);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, .6); border-radius: var(--aq-r-m);
+  box-shadow: var(--aq-shadow-lift);
+  opacity: 0; transform: translateY(14px);
+  transition: opacity var(--aq-t-reveal) var(--aq-ease) 520ms,
+              transform var(--aq-t-reveal) var(--aq-ease) 520ms;
+}
+.on .float-card { opacity: 1; transform: none; }
+.float-card .fc-id {
+  display: block; margin-bottom: var(--aq-s2);
+  font: 500 10px/1.5 var(--aq-mono); letter-spacing: .02em; color: var(--aq-teal);
+  overflow-wrap: anywhere;
+}
+.float-card .fc-t {
+  display: block; font-family: var(--aq-display); font-size: 15px; font-weight: 750;
+  letter-spacing: -.03em; color: var(--aq-text);
+}
+.float-card dl {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
+  margin: var(--aq-s3) 0 0; padding-top: var(--aq-s3);
+  border-top: 1px solid var(--aq-border);
+  font: 500 11.5px/1.4 var(--aq-mono);
+}
+.float-card dt { color: var(--aq-soft); }
+.float-card dd { margin: 0; color: var(--aq-text); text-align: right; }
+.float-card dd.hot { color: var(--aq-red); font-weight: 700; }
+/* Телефонда карточка кадрдың үстінде емес, ішінде — қара алаңда
+   ақ карточка болып тұрады. Шеттен 12px шегініп, өз пішінін сақтайды. */
+@media (max-width: 620px) {
+  .float-card {
+    position: static; width: auto; margin: 12px;
+    opacity: 1; transform: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: var(--aq-surface); border-color: var(--aq-border);
+  }
+}
+
+/* ---------- 4. Тірі портал терезесі ---------- */
+
+.embed {
+  /* Ені экран биіктігіне қарай шектеледі — бөлім бір экранға сыюы үшін */
+  max-width: min(1040px, calc(36svh * 16 / 9));
+  margin-inline: auto;
+  border: 1px solid var(--aq-border); border-radius: var(--aq-r-l);
+  overflow: hidden; background: #050506; box-shadow: var(--aq-shadow-lift);
+}
+/* Кең нұсқа: карта бағананың толық енін алады — интерфейс қысылмайды.
+   Биіктігі бәрібір экранға байланған, бөлім бір экраннан аспайды. */
+/* Кең нұсқа: карта бағанасының толық енін алады.
+   width: 100% МІНДЕТТІ — әйтпесе .embed-frame-тегі aspect-ratio
+   биіктік шектеуіне қарап енін өзі кішірейтіп жібереді. */
+.embed--wide { max-width: none; width: 100%; }
+
+.embed-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
+.embed iframe {
+  position: absolute; left: 0; top: 0; border: 0;
+  /* max-width: none МІНДЕТТІ: жаһандық `iframe { max-width: 100% }`
+     ережесі 1920px кадрды контейнер еніне дейін қысып тастайтын да,
+     порталдың ішінде телефон нұсқасы ашылатын. */
+  width: 1920px; max-width: none; height: 1080px;
+  transform-origin: 0 0; transform: scale(var(--embed-k, .75));
+  pointer-events: none;   /* бұл — дәлел, ойыншық емес */
+}
+.embed-cap {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  padding: 13px 16px; background: var(--aq-surface); border-top: 1px solid var(--aq-border);
+  font-size: 13px; line-height: 1.5; color: var(--aq-muted);
+}
+.embed-cap span { flex: 1 1 300px; }
+.embed-cap .btn { flex: none; white-space: nowrap; }
+@media (max-width: 560px) {
+  .embed-cap span { flex: 1 1 100%; }
+  .embed-cap .btn { width: 100%; }
+}
+
+/* ---------- 5. Адамның көзі / жүйенің көзі ---------- */
+
+.rev {
+  position: relative; border-radius: var(--aq-r-l); overflow: hidden;
+  border: 1px solid var(--aq-border); background: #0b0b0c;
+  box-shadow: var(--aq-shadow-lift);
+  aspect-ratio: 16 / 9;
+  cursor: ew-resize; user-select: none; touch-action: none;
+}
+.rev img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.rev-over { position: absolute; inset: 0; z-index: 2; clip-path: inset(0 0 0 var(--rp, 55%)); }
+.rev-over svg { width: 100%; height: 100%; display: block; }
+
+/* Скроллмен ашылғанда қозғалыс жұмсартылады: тінтуірдің әр «тырсылы»
+   секіріп көрінбей, тұтқа біркелкі жылжиды.
+   Ал қолмен сүйрегенде жұмсарту КЕДЕРГІ — тұтқа саусақтан қалады,
+   сондықтан ол кезде өшіріледі. */
+.rev:not(.by-hand) .rev-over,
+.rev:not(.by-hand) .rev-bar { transition: clip-path 260ms var(--aq-ease), left 260ms var(--aq-ease); }
+
+.rev-bar {
+  position: absolute; top: 0; bottom: 0; left: var(--rp, 55%); z-index: 4;
+  width: 2px; background: #fff; transform: translateX(-1px);
+}
+.rev-bar::after {
+  content: "\2039\00a0\00a0\203A";
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  min-width: var(--aq-tap); height: 38px; display: grid; place-items: center;
+  padding: 0 14px; border-radius: 100px;
+  background: #fff; color: var(--aq-black);
+  font: 800 15px/1 var(--aq-mono); white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .32);
+}
+/* Бұл екі белгі — интерфейстің өз бөлігі, сондықтан кадрда тұрады */
+.rev-tag {
+  position: absolute; z-index: 5; top: 16px; padding: 8px 13px; border-radius: 100px;
+  font: 800 10.5px/1 var(--aq-sans); letter-spacing: .14em; text-transform: uppercase;
+  background: rgba(255, 255, 255, .92); color: var(--aq-black);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.rev-tag.l { left: 16px; }
+.rev-tag.r { right: 16px; background: var(--aq-red); color: #fff; }
+
+.dtc-line { fill: none; stroke: #1adfe3; stroke-width: 3; stroke-linecap: round; }
+.dtc-box  { fill: rgba(255, 90, 52, .16); stroke: #ff5a34; stroke-width: 3; }
+.dtc-lb rect { fill: #ff5a34; }
+.dtc-lb text { fill: #fff; font: 800 21px var(--aq-sans); }
+
+/* ============================================================
+   5б. КАДР + СІЛТЕМЕ БЕЛГІСІ
+   ------------------------------------------------------------
+   Сол жақта видео, оң жақта мәтін. Скроллмен видео ойнай
+   бастайды, сол сәтте камераға қарай сызық сызылып, «Камера»
+   деген белгі шығады.
+   ============================================================ */
+
+.ready-grid {
+  display: grid; gap: clamp(28px, 3.4vw, 56px); align-items: center;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+}
+@media (max-width: 940px) { .ready-grid { grid-template-columns: 1fr; } }
+
+.shot {
+  position: relative; margin: 0;
+  /* Кадр стандарт өлшемнен аспайды: беттегі басқа карточкалармен
+     бір қатарда тұруы керек, бөлек «баннер» болып шықпауы тиіс */
+  max-width: 640px;
+  border-radius: var(--aq-r-l); overflow: hidden;
+  background: #0b0b0c; border: 1px solid var(--aq-border);
+  box-shadow: var(--aq-shadow-lift);
+}
+.shot video {
+  display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover;
+  transform: scale(1.05); transition: transform 2.4s var(--aq-ease);
+}
+.shot.on video { transform: none; }
+
+/* Сілтеме сызығы — кадрдың үстінде, бірақ суретті жаппайды.
+   slice: SVG видеомен ДӘЛ сол қиылымда тұрады (object-fit: cover),
+   әйтпесе пропорция өзгергенде сілтеме камерадан жылжып кетеді. */
+.shot-call { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; }
+.cl-line {
+  fill: none; stroke: #fff; stroke-width: 1.4; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 160; stroke-dashoffset: 160;
+  /* Жаймен сызылады — көз ілесіп үлгеруі керек */
+  transition: stroke-dashoffset 1.6s var(--aq-ease) 900ms;
+}
+.shot.on .cl-line { stroke-dashoffset: 0; }
+.cl-dot { fill: #fff; opacity: 0; transition: opacity 400ms var(--aq-ease) 640ms; }
+.shot.on .cl-dot { opacity: 1; }
+.cl-ring {
+  fill: none; stroke: #fff; stroke-width: 1.2; opacity: 0;
+  transform-box: fill-box; transform-origin: center;
+}
+.shot.on .cl-ring { animation: clPing 2.4s var(--aq-ease) 1s infinite; }
+@keyframes clPing {
+  0%   { opacity: .8; transform: scale(1); }
+  70%  { opacity: 0;  transform: scale(3.4); }
+  100% { opacity: 0;  transform: scale(3.4); }
+}
+
+.shot-tag {
+  position: absolute; z-index: 3; right: 5%; top: 20%;
+  display: grid; gap: 2px; padding: 9px 14px;
+  border-radius: var(--aq-r-s);
+  background: rgba(255, 255, 255, .95);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .3);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 520ms var(--aq-ease) 1350ms, transform 520ms var(--aq-ease) 1350ms;
+}
+.shot.on .shot-tag { opacity: 1; transform: none; }
+.shot-tag b {
+  font-family: var(--aq-display); font-size: 14px; font-weight: 800;
+  letter-spacing: -.02em; color: var(--aq-text);
+}
+.shot-tag i {
+  font-style: normal; font-size: 11px; color: var(--aq-muted); white-space: nowrap;
+}
+@media (max-width: 560px) { .shot-tag { right: 3%; top: 12%; padding: 7px 11px; } }
+
+/* Скролл барысы — видеоның қай кадрында тұрғанын көрсетеді */
+.shot-progress {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  height: 3px; background: rgba(255, 255, 255, .18);
+}
+.shot-progress i {
+  display: block; height: 100%; background: var(--aq-red-mid);
+  transform: scaleX(0); transform-origin: 0 50%;
+}
+
+/* ---------- Карта бөлімі: сол жақта мәтін, оң жақта кең карта ---------- */
+
+.map-split {
+  display: grid; gap: clamp(24px, 3vw, 44px); align-items: center;
+  grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+}
+@media (max-width: 980px) { .map-split { grid-template-columns: 1fr; } }
+.map-split .lead { margin-top: 18px; }
+
+.ready-copy .facts { margin-top: clamp(20px, 3vh, 32px); }
+
+/* ---------- 5в. Келесі сенсор көзі ---------- */
+
+.next-src {
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px; border: 1px solid var(--aq-border); border-radius: var(--aq-r-m);
+  background: var(--aq-surface);
+}
+.next-src video {
+  flex: none; width: 148px; border-radius: var(--aq-r-s);
+  aspect-ratio: 4 / 3; object-fit: cover; background: #0b0b0c;
+}
+.next-src > div { display: grid; gap: 5px; }
+.next-src b {
+  font-family: var(--aq-display); font-size: 15.5px; font-weight: 750; letter-spacing: -.028em;
+}
+.next-src > div > span:last-child { font-size: 13px; line-height: 1.5; color: var(--aq-muted); }
+.next-src .tag { justify-self: start; }
+@media (max-width: 520px) {
+  .next-src { flex-direction: column; align-items: stretch; }
+  .next-src video { width: 100%; aspect-ratio: 16 / 9; }
+}
+
+/* ---------- 6. Архитектура схемасы ---------- */
+
+.flow {
+  border: 1px solid var(--aq-border); border-radius: var(--aq-r-l);
+  background: var(--aq-surface); padding: clamp(20px, 2.6vw, 34px);
+  overflow-x: auto;
+}
+.sec-black .flow { background: rgba(255, 255, 255, .04); border-color: var(--aq-hair-2); }
+.flow svg { width: 100%; min-width: 800px; height: auto; display: block; }
+
+.fl-link {
+  fill: none; stroke: var(--aq-border-2); stroke-width: 1.3;
+  stroke-dasharray: var(--l, 400); stroke-dashoffset: var(--l, 400);
+  transition: stroke-dashoffset 1.1s var(--aq-ease);
+}
+.sec-black .fl-link { stroke: var(--aq-hair-2); }
+.flow.on .fl-link { stroke-dashoffset: 0; }
+
+.fl-node {
+  opacity: 0; transform: translateY(12px); transform-box: fill-box;
+  transition: opacity var(--aq-t-reveal) var(--aq-ease), transform var(--aq-t-reveal) var(--aq-ease);
+}
+.flow.on .fl-node { opacity: 1; transform: none; }
+.flow.on .n2 { transition-delay: 100ms; }
+.flow.on .n3 { transition-delay: 200ms; }
+.flow.on .n4 { transition-delay: 300ms; }
+.flow.on .n5 { transition-delay: 400ms; }
+.flow.on .n6 { transition-delay: 500ms; }
+
+.fl-box     { fill: #f0f0ee; stroke: var(--aq-border); stroke-width: 1; }
+.fl-box.hot { fill: #fdeee9; stroke: #f0b8a6; }
+.fl-box.ok  { fill: #e4f4f5; stroke: #9fd6da; }
+.fl-t   { fill: #0a0a0a; font: 750 14px var(--aq-display); letter-spacing: -.03em; }
+.fl-s   { fill: #5a5a56; font: 400 10.5px var(--aq-mono); }
+.fl-lbl { fill: #6b6b66; font: 700 10px var(--aq-mono); letter-spacing: .18em; }
+
+.sec-black .fl-box     { fill: rgba(255, 255, 255, .05); stroke: var(--aq-hair-2); }
+.sec-black .fl-box.hot { fill: rgba(227, 71, 37, .16);  stroke: rgba(255, 106, 69, .5); }
+.sec-black .fl-box.ok  { fill: rgba(0, 168, 180, .14);  stroke: rgba(26, 223, 227, .45); }
+.sec-black .fl-t   { fill: #fff; }
+.sec-black .fl-s   { fill: #a8a8a3; }
+.sec-black .fl-lbl { fill: #7e8f93; }
+
+/* Тізбек бойымен жүретін оқиға нүктесі */
+.fl-dot { fill: var(--aq-red-mid); opacity: 0; }
+.flow.on .fl-dot { animation: pk 7s linear 1.4s infinite; }
+@keyframes pk { 0% { opacity: 0; } 5% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---------- 7. Қозғалысты азайту ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .scan.on i, .flow.on .fl-dot, .frame-meta .rec::before, .eyebrow .dot { animation: none !important; }
+  .br { opacity: 1; transform: none; }
+  .fl-link { stroke-dashoffset: 0; }
+  .fl-node { opacity: 1; transform: none; }
+  .float-card { opacity: 1; transform: none; }
+}

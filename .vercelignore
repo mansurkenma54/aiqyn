@@ -6,7 +6,16 @@
 # сыймайды. Сайттың өзі ~1 МБ.
 
 # --- AI бөлігі (серверде керек емес) ---
-vision/
+#
+# vision/ толығымен алынып тасталады, БІРАҚ үш файл қалады: сайт соларға
+# сүйенеді, ал олардың сыртқы тәуелділігі жоқ (тек стандарт кітапхана).
+#   categories.py — ақау түрлерінің ресми атаулары (форма, құжат)
+#   env.py        — .env оқу
+# Оларсыз /api/categories 500 қатесін беретін.
+vision/*
+!vision/__init__.py
+!vision/categories.py
+!vision/env.py
 models/
 scripts/
 simulator/
@@ -16,11 +25,28 @@ preview/
 tests/
 
 # --- жергілікті деректер ---
+# Ескі hero видеосы (9,8 МБ) енді қолданылмайды — оның орнына
+# patrol-cam.mp4 (0,5 МБ) тұр. Файл жойылған жоқ, тек серверге бармайды.
+portal/static/video/aiqyn-loop.mp4
+portal/static/video/aiqyn-loop.jpg
+# Офлайн демоға арналған карта кэші — тек ноутбукта керек
+portal/static/tiles/
 portal/media/
 portal/aiqyn.db
 portal/aiqyn.db-wal
 portal/aiqyn.db-shm
 portal/mock_109_tickets.jsonl
+portal/citizen_reports.jsonl
+portal/aiqyn.db.bak
+portal/aiqyn.db.*.bak
+portal/_old/
+*.bak
+reports/
+docx_build/
+.agents/
+demo_track.jsonl
+kernel.errors.txt
+skills-lock.json
 zones_cache.json
 route_cache.json
 
@@ -37,3 +63,6 @@ config.json
 # Тек ТҮБІРДЕГІ requirements.txt (AI пакеттері) — api/requirements.txt
 # қажет, ол Vercel-ге сайттың пакеттерін орнатады
 /requirements.txt
+
+# Claude Code баптаулары — сайтқа қажет емес
+.claude/

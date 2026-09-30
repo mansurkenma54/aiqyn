@@ -6,7 +6,7 @@
 
 Мазмұны:
     шапка → кімге → ақау туралы кесте → ресми мәтін (қаз) → орысша нұсқа
-    → ИИ талдауының қорытындысы → дәлел фотосы → қолтаңба орны
+    → ЖИ талдауының қорытындысы → дәлел фотосы → қолтаңба орны
 """
 
 from __future__ import annotations
@@ -323,7 +323,7 @@ def build_docx(document: dict, media_dir: Path) -> io.BytesIO:
 
     if document.get("ai_verified"):
         rows.append((
-            "Қосымша AI бағасы",
+            "Қосымша ЖИ бағасы",
             f"Алдын ала талдау бар "
             f"({float(document.get('ai_confidence') or 0) * 100:.0f}%); "
             "инженерлік тексеруді алмастырмайды",
@@ -337,10 +337,10 @@ def build_docx(document: dict, media_dir: Path) -> io.BytesIO:
     if document.get("ai_action"):
         urgency = document.get("ai_urgency_days") or 0
         suffix = (
-            f"  (AI бағдарлаған мерзім: {urgency} күн; нормативтік SLA емес)"
+            f"  (ЖИ бағдарлаған мерзім: {urgency} күн; нормативтік SLA емес)"
             if urgency else ""
         )
-        rows.append(("AI ұсынған ықтимал шара", f"{document['ai_action']}{suffix}"))
+        rows.append(("ЖИ ұсынған ықтимал шара", f"{document['ai_action']}{suffix}"))
 
     table = doc.add_table(rows=0, cols=2)
     table.style = "Table Grid"
@@ -401,7 +401,7 @@ def build_docx(document: dict, media_dir: Path) -> io.BytesIO:
     disclaimer.paragraph_format.space_after = Pt(8)
     _add_run(
         disclaimer,
-        "Маңызды: AI-модельдің бағасы алдын ала сипатта болады және инженерлік "
+        "Маңызды: ЖИ-модельдің бағасы алдын ала сипатта болады және инженерлік "
         "тексеруді, нормативтік қорытындыны немесе жауапты органның шешімін "
         "алмастырмайды.",
         size=8.5, color=GREY, italic=True,
@@ -580,7 +580,7 @@ def build_docx(document: dict, media_dir: Path) -> io.BytesIO:
     _add_run(
         note,
         f"{state_note} {review_note} "
-        "AI бағасы инженерлік тексеруді немесе жауапты органның шешімін "
+        "ЖИ бағасы инженерлік тексеруді немесе жауапты органның шешімін "
         "алмастырмайды. Жүйе тұлғаны немесе көлік нөмірін танымайды; тек "
         "инфрақұрылым ақауының белгілерін тіркейді.\n"
         f"AIQYN оқиға ID: {document.get('event_id', '')}",
